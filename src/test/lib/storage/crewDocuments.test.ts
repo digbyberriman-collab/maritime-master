@@ -4,7 +4,9 @@
  * documents-bucket gate accepts, size and type checks with plain
  * sentences, the stored path returned (never a URL), storage errors thrown
  * as they are, the MIME list equal to the bucket's (upload-policy.json and
- * 20261124000100), and no legacy CrewDocumentKind that could meet the prefix.
+ * 20261124000100), no legacy CrewDocumentKind that could meet the X1
+ * prefix, and every legacy kind named by a branch of the crew/ gate (D-373),
+ * so no HR uploader falls through to the fail-closed default.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -151,12 +153,27 @@ describe('uploadCrewDocumentFile', () => {
 });
 
 describe('the prefix and the bucket agree with the SQL', () => {
-  it('no legacy CrewDocumentKind is "documents", so legacy HR paths never fall under the gate', () => {
+  it('no legacy CrewDocumentKind is "documents", so legacy HR paths never share the X1 folder', () => {
     expect(CREW_DOCUMENT_KINDS).not.toContain('documents');
     for (const kind of CREW_DOCUMENT_KINDS) {
       const legacy = buildCrewDocumentPath({ companyId: COMPANY, crewUserId: PROFILE, kind, fileName: 'x.pdf' });
       expect(legacy.split('/')[3]).toBe(kind);
       expect(legacy.split('/')[3]).not.toBe('documents');
+    }
+  });
+
+  it('every legacy kind has a branch in the crew/ gate (D-373) and its paths have the five-segment shape the gate accepts', () => {
+    const sql = readFileSync(join(ROOT, 'supabase/migrations/20261124000100_platform_storage_crew_documents.sql'), 'utf8');
+    const gate = /CREATE OR REPLACE FUNCTION public\.storage_crew_document_allowed\(p_name text, p_action text\)[\s\S]*?\n\$\$;/.exec(sql)?.[0] ?? '';
+    expect(gate).not.toBe('');
+    const named = new Set(Array.from(gate.matchAll(/v_kind (?:IN \(([^)]*)\)|= '([^']+)')/g), (m) => m[1] ?? `'${m[2]}'`).flatMap((list) => Array.from(list.matchAll(/'([^']+)'/g), (k) => k[1])));
+    for (const kind of CREW_DOCUMENT_KINDS) expect(named.has(kind), kind).toBe(true);
+    const file = /^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$/;
+    for (const kind of CREW_DOCUMENT_KINDS) {
+      const parts = buildCrewDocumentPath({ companyId: COMPANY, crewUserId: PROFILE, kind, fileName: 'scan.PDF' }).split('/');
+      expect(parts).toHaveLength(5);
+      expect(parts[1]).toBe('crew');
+      expect(parts[4]).toMatch(file);
     }
   });
 

@@ -25,7 +25,8 @@
 --   development_application_notify, development_audit
 -- Triggers: development_applications_guard, development_applications_audit,
 --   development_application_events_guard; generate_dev_application_number()
---   redefined (the one build-out definition, D-120)
+--   redefined (the one build-out definition, D-120) and the legacy
+--   trg_dev_application_number recreated without its WHEN clause (D-379)
 -- TS mirrors: src/modules/development/types/db.pending.ts (columns, rows,
 --   RPCs); src/modules/development/lib/applicationMachine.ts (the states x
 --   actions table and the actor table, copied between the machine-table and
@@ -98,8 +99,9 @@
 -- (guarded emits, D-128; in-app only, D-249): the next actor
 -- (training_application_action_needed: the HODs covering the applicant at
 -- the HOD stage, the Captains and Pursers still to decide at the final
--- stage, on the vessel's Crew Training page; the training admins once
--- completed, on Fleet Training) and the applicant when someone else acted
+-- stage, on the vessel's Crew Training page; the training admins and the
+-- company's active HR viewers (hr_can_view, W3 "completion notifies HR",
+-- D-383) once completed, on Fleet Training) and the applicant when someone else acted
 -- (training_application_updated, personal Training). A type that is not
 -- seeded, or a failed fan-out, never rolls back the transition.
 --
@@ -165,7 +167,12 @@
 -- inserts serialise on the counter row instead of reading the same
 -- MAX()+1, gap/00 §7), seeded from the company's current maximum so
 -- numbers continue (CDA-YYYYMMDD-NNNN). application_number is unique per
--- company (it was globally unique while numbered per company).
+-- company (it was globally unique while numbered per company). The legacy
+-- trigger trg_dev_application_number is recreated without its WHEN clause
+-- (D-379): a browser caller's supplied number is replaced by the counter
+-- value; only STORM's definers and non-browser roles (service, owner
+-- import) keep a number they give. The guard keeps the number locked on
+-- UPDATE.
 --
 -- Live behaviour once applied (owner's apply session; ledger row 7):
 --   - every status change goes through development_transition; the client
@@ -694,8 +701,14 @@ BEGIN
 END;
 $$;
 
--- The live trigger function (trg_dev_application_number, BEFORE INSERT
--- when no number is given), redefined here once (D-120).
+-- The live trigger function, redefined here once (D-120), and its trigger
+-- recreated without the legacy WHEN clause (D-379): every insert passes
+-- through it. A number the caller supplies is kept only for STORM's own
+-- definers (storm.fleet_tx = 'on') and for non-browser roles (the service
+-- role, the owner's import, no-JWT maintenance); a browser caller
+-- (authenticated or anon) always gets the next counter value, so a crew
+-- member cannot take a number ahead of the counter and block every later
+-- application of the company on the unique key.
 CREATE OR REPLACE FUNCTION public.generate_dev_application_number()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -703,10 +716,20 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  IF coalesce(NEW.application_number, '') <> ''
+     AND (coalesce(current_setting('storm.fleet_tx', true), '') = 'on'
+          OR coalesce(auth.role(), '') NOT IN ('authenticated', 'anon')) THEN
+    RETURN NEW;
+  END IF;
   NEW.application_number := public.development_application_number_for(NEW.company_id);
   RETURN NEW;
 END;
 $$;
+
+DROP TRIGGER IF EXISTS trg_dev_application_number ON public.development_applications;
+CREATE TRIGGER trg_dev_application_number
+  BEFORE INSERT ON public.development_applications
+  FOR EACH ROW EXECUTE FUNCTION public.generate_dev_application_number();
 
 -- Seed the counters from today's numbers (greater value wins on a re-run).
 INSERT INTO public.reference_counters (scope, next_value)
@@ -725,7 +748,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_flag boolean := current_setting('storm.fleet_tx', true) = 'on';
+  v_flag boolean := coalesce(current_setting('storm.fleet_tx', true), '') = 'on';
   v_lifecycle text[] := ARRAY[
     'status', 'submitted_at', 'stage_entered_at',
     'hod_reviewer_id', 'hod_reviewed_at', 'hod_decision', 'hod_comments',
@@ -1107,9 +1130,12 @@ BEGIN
     SELECT coalesce(array_agg(DISTINCT p.user_id), '{}'::uuid[]) INTO v_admins
     FROM public.profiles AS p
     WHERE p.company_id = a.company_id AND p.user_id IS NOT NULL AND p.user_id IS DISTINCT FROM a.crew_member_id
-      AND (p.role::text IN ('dpa', 'shore_management')
-           OR EXISTS (SELECT 1 FROM public.rbac_user_roles AS r WHERE r.user_id = p.user_id AND coalesce(r.is_active, false)))
-      AND public.fleet_ops_can_for(p.user_id, a.company_id, NULL, 'training', 'admin');
+      AND (((p.role::text IN ('dpa', 'shore_management')
+             OR EXISTS (SELECT 1 FROM public.rbac_user_roles AS r WHERE r.user_id = p.user_id AND coalesce(r.is_active, false)))
+            AND public.fleet_ops_can_for(p.user_id, a.company_id, NULL, 'training', 'admin'))
+           -- W3 "completion notifies HR" (D-383): HR viewers of the same
+           -- company, active, alongside the training admins.
+           OR (public.user_is_active(p.user_id) AND public.hr_can_view(p.user_id)));
   END IF;
 
   IF cardinality(v_next) > 0 THEN
@@ -2013,13 +2039,13 @@ COMMENT ON FUNCTION public.development_reviewer_for(uuid, uuid, uuid) IS 'RLS he
 COMMENT ON FUNCTION public.development_application_company(uuid) IS 'RLS helper (fleet_training_participants): the application''s company when it is the caller''s own, NULL otherwise.';
 COMMENT ON FUNCTION public.development_actor_roles_for(uuid, public.development_applications) IS 'The roles the user holds on the application: applicant only for the applicant; otherwise hod, captain, purser, training_editor, training_admin as held. Internal.';
 COMMENT ON FUNCTION public.development_application_number_for(uuid) IS 'The company''s next application number (CDA-YYYYMMDD-NNNN) from the counter dev_app:<company> (next_reference_value), seeded once from the highest existing number. Internal (generate_dev_application_number).';
-COMMENT ON FUNCTION public.generate_dev_application_number() IS 'Trigger trg_dev_application_number: numbers a new application from the company counter (development_application_number_for); no MAX()+1.';
+COMMENT ON FUNCTION public.generate_dev_application_number() IS 'Trigger trg_dev_application_number (BEFORE INSERT, every row, no WHEN clause; D-379): numbers a new application from the company counter (development_application_number_for); no MAX()+1. A number supplied by a browser caller (authenticated / anon) is replaced by the counter value; STORM''s definers (storm.fleet_tx) and non-browser roles (service, owner import) keep theirs.';
 COMMENT ON FUNCTION public.development_applications_guard() IS 'Trigger (every role): outside storm.fleet_tx an application starts as a draft with no decisions on a vessel of its company, its status and review / outcome / completion columns never change, its content changes only while draft or returned, only a draft is deleted; id, company, applicant, number and creation time never change (42501 development_applications_guarded).';
 COMMENT ON FUNCTION public.development_application_log(public.development_applications, text, text, text, text, text, jsonb, jsonb) IS 'Writes one development_application_events row with auth.uid() as actor. Internal.';
 COMMENT ON FUNCTION public.development_applications_audit() IS 'Trigger: the created event of every new application.';
 COMMENT ON FUNCTION public.development_application_events_guard() IS 'Trigger: application history is inserted only by the definers (storm.fleet_tx) and never updated or deleted (a cascade excepted).';
 COMMENT ON FUNCTION public.development_record_qualification(public.development_applications, date, text) IS 'TR9 (platform-prep plan contract 3): writes the qualification of a completed application once: X1''s crew_document_record_from_source when the course names a crew document type and the function exists, else a legacy crew_certificates row; expiry = completed_on + valid_for_months. Internal.';
-COMMENT ON FUNCTION public.development_application_notify(public.development_applications, text, uuid, text) IS 'After a transition: training_application_action_needed to the next actor (HODs, the Captains / Pursers still to decide, training admins once completed) and training_application_updated to the applicant when someone else acted; guarded emits (D-128), in-app only (D-249). Internal.';
+COMMENT ON FUNCTION public.development_application_notify(public.development_applications, text, uuid, text) IS 'After a transition: training_application_action_needed to the next actor (HODs, the Captains / Pursers still to decide, training admins and the company''s active HR viewers once completed, D-383) and training_application_updated to the applicant when someone else acted; guarded emits (D-128), in-app only (D-249). Internal.';
 COMMENT ON FUNCTION public.development_transition(uuid, text, jsonb, timestamptz) IS 'Moves a training application along the machine (gap/02 W3, TR4-TR6, TR9): submit, hod_approve, hod_return, final_approve (both | either), final_approve_discretionary, return, reject, cancel, enrol, complete (writes the qualification), reimburse, close, void, edit_fields; actor rules per action, the optional expected updated_at, one event row, the stage stamp and the notifications. Returns the new state as jsonb.';
 COMMENT ON FUNCTION public.development_admin_gate() IS 'The caller''s company once they are a fleet training admin there (fleet_ops_can_for training admin); 42501 not_permitted otherwise. Internal.';
 COMMENT ON FUNCTION public.development_audit(uuid, text, jsonb) IS 'Writes one development_audit_log row for a catalogue or settings change. Internal.';

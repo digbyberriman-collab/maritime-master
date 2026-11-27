@@ -60,9 +60,14 @@
 --                    crew documents = every other type), else endorsement
 --                    overdue, else expiring (expiring_soon + expiring, the
 --                    per-type windows of expiry_window_rules).
---   Hours of rest    crew-days of the last 30 days (window_start, UTC) with
---                    a failing work_rest_compliance_checks row (breach
---                    days); passing within 60 minutes of threshold_minutes
+--   Hours of rest    breach crew-days of the last 30 days, the R9 report's
+--                    (D-380): X1's live, not dismissed non-conformities of
+--                    any rule (day breach_day, else the UTC day of the
+--                    minute before window_end; vessel the NC's, else its
+--                    submission's, else the assignment covering the day)
+--                    when X1's breach review columns exist, else a failing
+--                    work_rest_compliance_checks row (window_start, UTC);
+--                    passing within 60 minutes of threshold_minutes
 --                    on a crew-day with no breach (near threshold); current,
 --                    not planned crew with a login who joined before today
 --                    and have no work_rest_records in the last 7 days (no
@@ -387,47 +392,127 @@ AS $$
 $$;
 
 -- Hours of rest per crew-day of the company's crew from _from to _to
--- (window_start in UTC): the vessel of each work_rest_compliance_checks row
--- is its submission's vessel, else the vessel of the crew member's
--- assignment covering that day (the latest join first); breach = a failing
--- check that day; near = a passing check within 60 minutes of its
--- threshold that day. Rows on vessels outside _vessel_ids are left out.
+-- (D-380: the same breach crew-days as the R9 report,
+-- fleet_report_hours_of_rest). breach: when X1's breach review columns
+-- exist on work_rest_non_conformities (review_outcome, is_serious,
+-- superseded_at, vessel_id, breach_day; information_schema, read through
+-- EXECUTE because a function body may not name columns that are not there
+-- yet), a live (not superseded), not dismissed non-conformity of any rule
+-- that day, the day being breach_day, else the UTC day of the minute
+-- before window_end (R9's key), the vessel the NC's own vessel, else its
+-- submission's, else the vessel of the crew member's assignment covering
+-- that day (the latest join first); otherwise the legacy rule: a failing
+-- work_rest_compliance_checks row that day (window_start in UTC). near: a
+-- passing check within 60 minutes of its threshold that day (vessel: the
+-- check's submission's, else the assignment covering that day); a crew-day
+-- with a breach is never near. Breach and near days are joined by vessel,
+-- crew and day. Rows on vessels outside _vessel_ids are left out.
 -- Internal (service role; fleet_dashboard_counts_for).
 CREATE OR REPLACE FUNCTION public.fleet_dashboard_hor_crew_days(_company_id uuid, _vessel_ids uuid[], _from date, _to date)
 RETURNS TABLE (vessel_id uuid, crew_id uuid, on_day date, breach boolean, near boolean)
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  WITH chk AS (
-    SELECT c.crew_id,
-           (c.window_start AT TIME ZONE 'UTC')::date AS on_day,
-           c.passes,
-           c.rest_minutes,
-           c.threshold_minutes,
-           coalesce(sub.vessel_id, (
-             SELECT ca.vessel_id FROM public.crew_assignments AS ca
-             WHERE ca.user_id = c.crew_id
-               AND (coalesce(ca.join_date, ca.start_date) IS NULL OR coalesce(ca.join_date, ca.start_date) <= (c.window_start AT TIME ZONE 'UTC')::date)
-               AND (coalesce(ca.leave_date, ca.end_date) IS NULL OR coalesce(ca.leave_date, ca.end_date) >= (c.window_start AT TIME ZONE 'UTC')::date)
-             ORDER BY coalesce(ca.join_date, ca.start_date) DESC NULLS LAST, ca.id
-             LIMIT 1)) AS vessel_id
-    FROM public.work_rest_compliance_checks AS c
-    JOIN public.profiles AS p ON p.user_id = c.crew_id AND p.company_id = _company_id
-    LEFT JOIN public.work_rest_monthly_submissions AS sub ON sub.id = c.submission_id
-    WHERE _company_id IS NOT NULL
-      AND cardinality(coalesce(_vessel_ids, ARRAY[]::uuid[])) > 0
-      AND c.window_start >= (_from::timestamp AT TIME ZONE 'UTC')
-      AND c.window_start < ((_to + 1)::timestamp AT TIME ZONE 'UTC')
-  )
-  SELECT k.vessel_id, k.crew_id, k.on_day,
-         bool_or(NOT k.passes),
-         bool_or(k.passes AND k.threshold_minutes IS NOT NULL AND k.rest_minutes >= k.threshold_minutes
-                 AND k.rest_minutes - k.threshold_minutes <= 60)
-  FROM chk AS k
-  WHERE k.vessel_id = ANY (_vessel_ids)
-  GROUP BY k.vessel_id, k.crew_id, k.on_day
+#variable_conflict use_column
+DECLARE
+  v_review boolean;
+BEGIN
+  IF _company_id IS NULL OR cardinality(coalesce(_vessel_ids, ARRAY[]::uuid[])) = 0 OR _from IS NULL OR _to IS NULL THEN
+    RETURN;
+  END IF;
+  v_review := (SELECT count(*) FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'work_rest_non_conformities'
+                 AND column_name IN ('review_outcome', 'is_serious', 'superseded_at', 'vessel_id', 'breach_day')) = 5;
+
+  IF v_review THEN
+    RETURN QUERY EXECUTE $x$
+      WITH nc AS (
+        SELECT n.crew_id,
+               coalesce(n.breach_day, ((n.window_end - interval '1 minute') AT TIME ZONE 'UTC')::date) AS on_day,
+               n.vessel_id AS nc_vessel, sub.vessel_id AS sub_vessel
+        FROM public.work_rest_non_conformities AS n
+        JOIN public.profiles AS p ON p.user_id = n.crew_id AND p.company_id = $1
+        LEFT JOIN public.work_rest_monthly_submissions AS sub ON sub.id = n.submission_id
+        WHERE n.superseded_at IS NULL
+          AND n.status IS DISTINCT FROM 'dismissed'
+          AND n.review_outcome IS DISTINCT FROM 'dismissed'
+          AND coalesce(n.breach_day, ((n.window_end - interval '1 minute') AT TIME ZONE 'UTC')::date) BETWEEN $3 AND $4
+      ),
+      br AS (
+        SELECT DISTINCT x.vessel_id, x.crew_id, x.on_day
+        FROM (
+          SELECT k.crew_id, k.on_day,
+                 coalesce(k.nc_vessel, k.sub_vessel, (
+                   SELECT ca.vessel_id FROM public.crew_assignments AS ca
+                   WHERE ca.user_id = k.crew_id
+                     AND (coalesce(ca.join_date, ca.start_date) IS NULL OR coalesce(ca.join_date, ca.start_date) <= k.on_day)
+                     AND (coalesce(ca.leave_date, ca.end_date) IS NULL OR coalesce(ca.leave_date, ca.end_date) >= k.on_day)
+                   ORDER BY coalesce(ca.join_date, ca.start_date) DESC NULLS LAST, ca.id
+                   LIMIT 1)) AS vessel_id
+          FROM nc AS k
+        ) AS x
+        WHERE x.vessel_id = ANY ($2)
+      ),
+      chk AS (
+        SELECT c.crew_id,
+               (c.window_start AT TIME ZONE 'UTC')::date AS on_day,
+               coalesce(sub.vessel_id, (
+                 SELECT ca.vessel_id FROM public.crew_assignments AS ca
+                 WHERE ca.user_id = c.crew_id
+                   AND (coalesce(ca.join_date, ca.start_date) IS NULL OR coalesce(ca.join_date, ca.start_date) <= (c.window_start AT TIME ZONE 'UTC')::date)
+                   AND (coalesce(ca.leave_date, ca.end_date) IS NULL OR coalesce(ca.leave_date, ca.end_date) >= (c.window_start AT TIME ZONE 'UTC')::date)
+                 ORDER BY coalesce(ca.join_date, ca.start_date) DESC NULLS LAST, ca.id
+                 LIMIT 1)) AS vessel_id
+        FROM public.work_rest_compliance_checks AS c
+        JOIN public.profiles AS p ON p.user_id = c.crew_id AND p.company_id = $1
+        LEFT JOIN public.work_rest_monthly_submissions AS sub ON sub.id = c.submission_id
+        WHERE c.passes AND c.threshold_minutes IS NOT NULL AND c.rest_minutes >= c.threshold_minutes
+          AND c.rest_minutes - c.threshold_minutes <= 60
+          AND c.window_start >= ($3::timestamp AT TIME ZONE 'UTC')
+          AND c.window_start < (($4 + 1)::timestamp AT TIME ZONE 'UTC')
+      ),
+      nr AS (
+        SELECT DISTINCT k.vessel_id, k.crew_id, k.on_day FROM chk AS k WHERE k.vessel_id = ANY ($2)
+      )
+      SELECT coalesce(b.vessel_id, n.vessel_id), coalesce(b.crew_id, n.crew_id), coalesce(b.on_day, n.on_day),
+             b.crew_id IS NOT NULL, n.crew_id IS NOT NULL
+      FROM br AS b
+      FULL JOIN nr AS n ON n.vessel_id = b.vessel_id AND n.crew_id = b.crew_id AND n.on_day = b.on_day
+    $x$ USING _company_id, _vessel_ids, _from, _to;
+    RETURN;
+  END IF;
+
+  -- The legacy rule: a failing check is a breach crew-day.
+  RETURN QUERY
+    WITH chk AS (
+      SELECT c.crew_id,
+             (c.window_start AT TIME ZONE 'UTC')::date AS on_day,
+             c.passes,
+             c.rest_minutes,
+             c.threshold_minutes,
+             coalesce(sub.vessel_id, (
+               SELECT ca.vessel_id FROM public.crew_assignments AS ca
+               WHERE ca.user_id = c.crew_id
+                 AND (coalesce(ca.join_date, ca.start_date) IS NULL OR coalesce(ca.join_date, ca.start_date) <= (c.window_start AT TIME ZONE 'UTC')::date)
+                 AND (coalesce(ca.leave_date, ca.end_date) IS NULL OR coalesce(ca.leave_date, ca.end_date) >= (c.window_start AT TIME ZONE 'UTC')::date)
+               ORDER BY coalesce(ca.join_date, ca.start_date) DESC NULLS LAST, ca.id
+               LIMIT 1)) AS vessel_id
+      FROM public.work_rest_compliance_checks AS c
+      JOIN public.profiles AS p ON p.user_id = c.crew_id AND p.company_id = _company_id
+      LEFT JOIN public.work_rest_monthly_submissions AS sub ON sub.id = c.submission_id
+      WHERE c.window_start >= (_from::timestamp AT TIME ZONE 'UTC')
+        AND c.window_start < ((_to + 1)::timestamp AT TIME ZONE 'UTC')
+    )
+    SELECT k.vessel_id, k.crew_id, k.on_day,
+           bool_or(NOT k.passes),
+           bool_or(k.passes AND k.threshold_minutes IS NOT NULL AND k.rest_minutes >= k.threshold_minutes
+                   AND k.rest_minutes - k.threshold_minutes <= 60)
+    FROM chk AS k
+    WHERE k.vessel_id = ANY (_vessel_ids)
+    GROUP BY k.vessel_id, k.crew_id, k.on_day;
+END;
 $$;
 
 -- ---------------------------------------------------------------- counts (internal)
@@ -436,8 +521,13 @@ $$;
 -- row with vessel_id NULL for the fleet-level items when the scope has
 -- them. A count is NULL where the part is not covered for that row (no
 -- access, or its module off); *_covered / *_on say which. Insurance:
--- expired, and expiring within 90 days. Internal (service role; the
--- definers below).
+-- expired, and expiring within 90 days. expiring is split by source
+-- (C-1, D-381): expiring_vessel_certificates (item type
+-- vessel_certificate) + expiring_crew_items (every other type the tile
+-- counts) = expiring. Internal (service role; the definers below).
+-- The return type grew (C-1): drop before recreating (the definers below
+-- are recreated after it).
+DROP FUNCTION IF EXISTS public.fleet_dashboard_counts_for(uuid, uuid, uuid[], date);
 CREATE OR REPLACE FUNCTION public.fleet_dashboard_counts_for(_user_id uuid, _company_id uuid, _vessel_ids uuid[], _today date)
 RETURNS TABLE (
   vessel_id uuid,
@@ -447,7 +537,8 @@ RETURNS TABLE (
   hours_of_rest_covered boolean, hours_of_rest_on boolean, breach_days integer, near_threshold integer, crew_without_entries integer,
   corrective_actions_covered boolean, drills_covered boolean, safety_on boolean,
   open_corrective_actions integer, overdue_corrective_actions integer, overdue_drills integer,
-  technical_covered boolean, technical_on boolean, open_jobs integer, overdue_jobs integer, pending_approval integer
+  technical_covered boolean, technical_on boolean, open_jobs integer, overdue_jobs integer, pending_approval integer,
+  expiring_vessel_certificates integer, expiring_crew_items integer
 )
 LANGUAGE plpgsql
 STABLE
@@ -483,7 +574,11 @@ BEGIN
              count(*) FILTER (WHERE e.bucket = 'expired' AND e.item_type NOT IN ('vessel_certificate', 'crew_qualification', 'training_course')) AS exp_crew_doc,
              count(*) FILTER (WHERE e.bucket = 'expired' AND e.item_type IN ('crew_qualification', 'training_course')) AS exp_qual,
              count(*) FILTER (WHERE e.bucket <> 'expired' AND e.endorsement_state = 'overdue') AS endorse,
-             count(*) FILTER (WHERE e.bucket IN ('expiring_soon', 'expiring') AND e.endorsement_state IS DISTINCT FROM 'overdue') AS expiring_n
+             count(*) FILTER (WHERE e.bucket IN ('expiring_soon', 'expiring') AND e.endorsement_state IS DISTINCT FROM 'overdue') AS expiring_n,
+             count(*) FILTER (WHERE e.bucket IN ('expiring_soon', 'expiring') AND e.endorsement_state IS DISTINCT FROM 'overdue'
+                              AND e.item_type = 'vessel_certificate') AS expiring_vessel_n,
+             count(*) FILTER (WHERE e.bucket IN ('expiring_soon', 'expiring') AND e.endorsement_state IS DISTINCT FROM 'overdue'
+                              AND e.item_type <> 'vessel_certificate') AS expiring_crew_n
       FROM exp AS e
       WHERE e.vid = ANY (sc.documents) AND e.item_type NOT IN ('insurance_policy', 'contract')
       GROUP BY e.vid
@@ -578,7 +673,9 @@ BEGIN
            f.tech_on,
            CASE WHEN f.tech_on THEN coalesce(jobs.open_n, 0)::integer END,
            CASE WHEN f.tech_on THEN coalesce(jobs.overdue_n, 0)::integer END,
-           CASE WHEN f.tech_on THEN coalesce(jobs.pending_n, 0)::integer END
+           CASE WHEN f.tech_on THEN coalesce(jobs.pending_n, 0)::integer END,
+           CASE WHEN f.doc_c THEN coalesce(doc.expiring_vessel_n, 0)::integer END,
+           CASE WHEN f.doc_c THEN coalesce(doc.expiring_crew_n, 0)::integer END
     FROM flags AS f
     LEFT JOIN doc ON doc.vid = f.id
     LEFT JOIN ins ON ins.vid IS NOT DISTINCT FROM f.id
@@ -598,7 +695,9 @@ $$;
 --   { vessels, tiles: {
 --       documents     { state ok | no_access, value, vessels,
 --                       parts { expired_vessel_certificates, expired_crew_documents,
---                               expired_crew_qualifications, endorsements_overdue, expiring } },
+--                               expired_crew_qualifications, endorsements_overdue, expiring,
+--                               expiring_vessel_certificates, expiring_crew_items } },
+--                       (the last two split expiring by source and sum to it; C-1, D-381)
 --       hours_of_rest { state ok | no_access | module_off, value (= breach_days), breach_days,
 --                       near_threshold, crew_without_entries, vessels_logging, vessels_off },
 --       safety        { state ok | no_access | module_off, value (= open + overdue drills), vessels,
@@ -642,6 +741,8 @@ BEGIN
          sum(c.expired_crew_qualifications) AS exp_qual,
          sum(c.endorsements_overdue) AS endorse,
          sum(c.expiring) AS expiring_n,
+         sum(c.expiring_vessel_certificates) AS expiring_vessel_n,
+         sum(c.expiring_crew_items) AS expiring_crew_n,
          count(*) FILTER (WHERE c.hours_of_rest_covered) AS hor_access_n,
          count(*) FILTER (WHERE c.hours_of_rest_on) AS hor_on_n,
          sum(c.breach_days) AS breach_n,
@@ -672,7 +773,9 @@ BEGIN
       'expired_crew_documents', coalesce(a.exp_crew_doc, 0),
       'expired_crew_qualifications', coalesce(a.exp_qual, 0),
       'endorsements_overdue', coalesce(a.endorse, 0),
-      'expiring', coalesce(a.expiring_n, 0))) END;
+      'expiring', coalesce(a.expiring_n, 0),
+      'expiring_vessel_certificates', coalesce(a.expiring_vessel_n, 0),
+      'expiring_crew_items', coalesce(a.expiring_crew_n, 0))) END;
 
   v_hor := CASE
     WHEN coalesce(a.hor_access_n, 0) = 0 THEN v_no
@@ -1015,7 +1118,11 @@ $$;
 
 -- One row per vessel of the caller's counted vessels (NULL) or the
 -- explicit, reach-checked ids, by name (gap/02 D15, R2 Vessel comparison):
---   documents     { value, expired, endorsements_overdue, expiring }
+--   documents     { value, expired, endorsements_overdue, expiring,
+--                   expired_vessel_certificates, expired_crew_items,
+--                   expiring_vessel_certificates, expiring_crew_items }
+--                   (by source: vessel certificates, else the crew items;
+--                   the pairs sum to expired / expiring; C-1, D-381)
 --   safety        { open_corrective_actions, overdue_corrective_actions, overdue_drills }
 --   technical     { open_jobs, overdue_jobs, pending_approval }
 --   insurance     { expired, expiring }   (within 90 days)
@@ -1052,7 +1159,11 @@ BEGIN
              'value', c.expired_vessel_certificates + c.expired_crew_documents + c.expired_crew_qualifications + c.endorsements_overdue + c.expiring,
              'expired', c.expired_vessel_certificates + c.expired_crew_documents + c.expired_crew_qualifications,
              'endorsements_overdue', c.endorsements_overdue,
-             'expiring', c.expiring) END,
+             'expiring', c.expiring,
+             'expired_vessel_certificates', c.expired_vessel_certificates,
+             'expired_crew_items', c.expired_crew_documents + c.expired_crew_qualifications,
+             'expiring_vessel_certificates', c.expiring_vessel_certificates,
+             'expiring_crew_items', c.expiring_crew_items) END,
            CASE WHEN (c.corrective_actions_covered OR c.drills_covered) AND c.safety_on THEN jsonb_build_object(
              'open_corrective_actions', c.open_corrective_actions,
              'overdue_corrective_actions', c.overdue_corrective_actions,
@@ -1098,8 +1209,8 @@ COMMENT ON FUNCTION public.fleet_dashboard_scope_for(uuid, uuid, uuid[], date) I
 COMMENT ON FUNCTION public.fleet_dashboard_job_state(text, date, date) IS 'A maintenance job''s dashboard state: closed (completed, cancelled, closed), pending_approval (gap/06 J3), overdue (open and due before today, or status Overdue), else open. Status words compare case-insensitively with spaces and dashes as underscores. Pure.';
 COMMENT ON FUNCTION public.fleet_dashboard_drill_overdue(text, timestamptz, date, date) IS 'Whether a drill is overdue: status Scheduled (or the legacy overdue), no actual date, scheduled before today. Pure.';
 COMMENT ON FUNCTION public.fleet_dashboard_open_corrective_actions(uuid) IS 'The company''s open corrective actions (status not Closed) with their vessel: the incident''s, else the audit finding''s audit''s; NULL = fleet-level (a company audit, or no incident and no finding). Actions whose incident or audit is another company''s are left out. Internal (service role; the dashboard definers).';
-COMMENT ON FUNCTION public.fleet_dashboard_hor_crew_days(uuid, uuid[], date, date) IS 'Hours of rest per crew-day (window_start in UTC) of the company''s crew on the given vessels: breach = a failing work_rest_compliance_checks row that day, near = a passing one within 60 minutes of its threshold. A check''s vessel is its submission''s, else the crew member''s assignment covering that day. Internal (service role; fleet_dashboard_counts_for).';
-COMMENT ON FUNCTION public.fleet_dashboard_counts_for(uuid, uuid, uuid[], date) IS 'The fleet dashboard counts per vessel of fleet_dashboard_scope_for (plus a vessel_id NULL row for fleet-level items with NULL ids and fleet reach): document alerts by part, insurance expired / expiring within 90 days, hours of rest breach days / near threshold / crew with no entries, open and overdue corrective actions, overdue drills, open / overdue / pending-approval jobs; a count is NULL where its part is not covered (no access or module off). Internal (service role; the dashboard definers).';
+COMMENT ON FUNCTION public.fleet_dashboard_hor_crew_days(uuid, uuid[], date, date) IS 'Hours of rest per crew-day of the company''s crew on the given vessels (D-380, the R9 report''s breach days): breach = a live, not dismissed X1 non-conformity of any rule that day when X1''s breach review columns exist (day breach_day, else the UTC day before window_end; vessel the NC''s, else its submission''s, else the assignment covering the day), else a failing work_rest_compliance_checks row that day (window_start in UTC); near = a passing check within 60 minutes of its threshold, never on a breach crew-day. Internal (service role; fleet_dashboard_counts_for).';
+COMMENT ON FUNCTION public.fleet_dashboard_counts_for(uuid, uuid, uuid[], date) IS 'The fleet dashboard counts per vessel of fleet_dashboard_scope_for (plus a vessel_id NULL row for fleet-level items with NULL ids and fleet reach): document alerts by part (expiring also split by source: vessel certificates and the crew items, C-1), insurance expired / expiring within 90 days, hours of rest breach days / near threshold / crew with no entries, open and overdue corrective actions, overdue drills, open / overdue / pending-approval jobs; a count is NULL where its part is not covered (no access or module off). Internal (service role; the dashboard definers).';
 COMMENT ON FUNCTION public.fleet_dashboard_kpis(uuid[], date) IS 'The fleet dashboard KPI row (gap/02 W9; D3, D4, D6, D7) as jsonb { vessels, today, tiles { documents, hours_of_rest, safety, technical, leave (not_enabled), finance (hidden) } }: each tile state ok | no_access | module_off with its value and parts (null for a part the caller cannot count, never 0). Vessels: NULL = the caller''s counted vessels plus fleet-level items with fleet reach; explicit ids reach-checked (42501 vessel_out_of_reach). Inactive caller, no company or no JWT: every tile no_access.';
 COMMENT ON FUNCTION public.fleet_dashboard_panels(uuid[], integer, date) IS 'The fleet dashboard ranked lists (gap/02 D9, D10, D12, D13) as jsonb: expiry groups (vessel certificates, crew documents, crew qualifications), open corrective actions, overdue drills, HESS meetings due (X2''s safety_hess_status (vessel_id, next_due_on) when it exists, else not_tracked), insurance expiring within 90 days, audits and surveys within 90 days and the work list per vessel; each with state, total and at most p_limit (1..20; 22023 invalid_limit) items, most urgent first. Same vessels and gates as fleet_dashboard_kpis.';
-COMMENT ON FUNCTION public.fleet_vessel_comparison(uuid[], date) IS 'One row per vessel of the caller''s counted vessels or the explicit, reach-checked ids (gap/02 D15, R2): documents, safety, technical, insurance and hours_of_rest as jsonb groups, NULL where the caller cannot count that group on that vessel (shown as a dash). Inactive caller, no company or no JWT: no row.';
+COMMENT ON FUNCTION public.fleet_vessel_comparison(uuid[], date) IS 'One row per vessel of the caller''s counted vessels or the explicit, reach-checked ids (gap/02 D15, R2): documents (by part, and by source: vessel certificates and the crew items, C-1), safety, technical, insurance and hours_of_rest as jsonb groups, NULL where the caller cannot count that group on that vessel (shown as a dash). Inactive caller, no company or no JWT: no row.';

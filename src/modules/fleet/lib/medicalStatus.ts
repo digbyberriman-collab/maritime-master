@@ -10,8 +10,8 @@
  *
  * Status, from the reasons (each has one level), most severe first:
  *
- *   critical    ENG1 (or an accepted equivalent) missing, assessed unfit or
- *               expired; a required vaccine expired or missing; a serious
+ *   critical    ENG1 (or an accepted equivalent) missing (with or without
+ *               a Health record, D-385), assessed unfit or expired; a required vaccine expired or missing; a serious
  *               rest breach in the last 30 days (< 4 h in 24 h or < 50 h in
  *               7 days)
  *   at_risk     ENG1 expires within 30 days (the 'medical' window, C5); a
@@ -156,7 +156,7 @@ const positive = (n: number | null): boolean => (n ?? 0) > 0;
 /** The reasons of one person, most severe first (`fleet_medical_reasons`). */
 export function medicalReasons(f: MedicalFacts): MedicalReason[] {
   const out: MedicalReason[] = [];
-  if (f.eng1State === 'missing' && f.hasHealthRecord) out.push('eng1_missing');
+  if (f.eng1State === 'missing') out.push('eng1_missing');
   if (f.eng1State === 'unfit') out.push('eng1_unfit');
   if (f.eng1State === 'expired') out.push('eng1_expired');
   if (positive(f.requiredExpired)) out.push('required_vaccine_expired');

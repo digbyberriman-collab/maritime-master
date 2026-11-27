@@ -78,7 +78,8 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261124060100_crew_reference_positions needs the reach helpers: apply 20261123000300_platform_account_memberships.sql first';
   END IF;
   IF to_regprocedure('public.has_capability_for(uuid,text,uuid,uuid)') IS NULL
-     OR position('vessel.crew.crew_compliance.admin' IN pg_get_functiondef('public.has_capability_for(uuid,text,uuid,uuid)'::regprocedure)) = 0 THEN
+     OR to_regprocedure('public.has_company_capability_for(uuid,text,uuid)') IS NULL
+     OR position('vessel.crew.crew_compliance.admin' IN pg_get_functiondef('public.capability_crew_key(uuid,text,uuid,uuid,boolean)'::regprocedure)) = 0 THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261124060100_crew_reference_positions needs has_capability_for() with the crew keys: apply 20261123000400_platform_capabilities.sql (platform prep PP1) first';
   END IF;
   IF to_regprocedure('public.user_belongs_to_company(uuid,uuid)') IS NULL
@@ -744,7 +745,9 @@ $$;
 
 -- A new position for this vessel (p_vessel_only, the default: needs
 -- vessel.crew.crew_compliance.admin on the vessel) or for the whole
--- company (needs the company-level answer of the same key). The key is
+-- company (needs the company-wide answer of the same key,
+-- has_company_capability_for: a role bound to one vessel does not count,
+-- D-376). The key is
 -- record_normalise_office(name); a position with that key or name (or a
 -- synonym of one) already visible there is refused (22023
 -- position_exists), so a vessel lists the existing one instead. When the
@@ -792,7 +795,7 @@ BEGIN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'positions_not_permitted',
         DETAIL = 'Only a crew compliance administrator of this vessel can add positions to it.';
     END IF;
-  ELSIF NOT public.has_capability_for(v_uid, 'vessel.crew.crew_compliance.admin', v_company, NULL) THEN
+  ELSIF NOT coalesce(public.has_company_capability_for(v_uid, 'vessel.crew.crew_compliance.admin', v_company), false) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'positions_not_permitted',
       DETAIL = 'Only a company-wide crew compliance administrator can add a position for the whole company.';
   END IF;
@@ -951,7 +954,8 @@ $$;
 -- (22023 alias_is_position). Creating an alias needs
 -- vessel.crew.crew_compliance.admin on the vessel; re-pointing one that
 -- exists changes it for every vessel of the company, so it needs the
--- company-level answer (42501 otherwise). Returns the row.
+-- company-wide answer (has_company_capability_for, D-376; 42501
+-- otherwise). Returns the row.
 CREATE OR REPLACE FUNCTION public.crew_position_alias_set(p_vessel_id uuid, p_alias text, p_position_id uuid)
 RETURNS public.position_aliases
 LANGUAGE plpgsql
@@ -994,7 +998,7 @@ BEGIN
   WHERE a.company_id = v_company AND a.alias_key = v_key
   FOR UPDATE;
   IF FOUND AND v_current IS DISTINCT FROM p_position_id
-     AND NOT coalesce(public.has_capability_for(v_uid, 'vessel.crew.crew_compliance.admin', v_company, NULL), false) THEN
+     AND NOT coalesce(public.has_company_capability_for(v_uid, 'vessel.crew.crew_compliance.admin', v_company), false) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'alias_change_not_permitted',
       DETAIL = 'This job title is already mapped for the whole company. Only a company-wide crew compliance administrator can change it.';
   END IF;

@@ -89,6 +89,8 @@ describe('pending types and the migrations', () => {
       'transfer_crew_options', 'transfer_crew_start', 'transfer_crew_review', 'transfer_crew_acknowledge', 'transfer_crew_submit',
       'transfer_crew_decide', 'transfer_crew_cancel', 'transfer_crew', 'transfer_crew_detail', 'crew_transfers_for_profile',
       'crew_end_employment', 'crew_vessel_employment_history', 'crew_rehire_prefill',
+      // The re-hire definer (Phase 3 wave 1 review, D-374).
+      'crew_rehire_save',
     ]);
     expect(crewMigrationFiles).toEqual([
       '20261124060100_crew_reference_positions.sql',

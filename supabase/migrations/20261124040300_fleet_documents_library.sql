@@ -97,15 +97,16 @@
 -- the company registered at
 -- <company>/fleet/documents/fleet_document/<document_id>/<uuid>-<name>
 -- (register_file_object, 20261123020300), used by no other version.
--- Library readers (fleet reach) open it through the bucket's own path
--- rule. Crew of targeted vessels open it through the storage read hook
--- storage_path_read_hooks() names for that path (PP4, PR-07): its
--- predicate fleet_document_file_readable(uuid, uuid) (library editors any
--- state, library readers non-drafts, fleet_document_visible() otherwise)
--- is defined with the vessel Fleet Documents page (X5-05A), once the
--- platform read-hook test no longer assumes it missing; until then crew
--- without fleet reach cannot open the files. Deleting a draft soft-removes
--- its files.
+-- Reads go through the storage read hook storage_path_read_hooks() names
+-- for that path (PP4, PR-07, D-382), whose answer is final: its predicate
+-- fleet_document_file_readable(uuid, uuid, text) is asked about the file
+-- itself (library editors any file, library readers the files of versions
+-- that are not drafts, the people the published document is visible to
+-- only the published version's file), so knowing a path opens nothing it
+-- does not allow; the vessel-folder variant of the path is refused. It is
+-- defined with the vessel Fleet Documents page (X5-05A); until it is in the
+-- database the bucket's generic path rule applies (fleet reach). Deleting a
+-- draft soft-removes its files.
 --
 -- Notifications: none here (D-128, D-238). fleet_document_published is
 -- emitted by X5-05A's publish trigger once the acknowledgement tables exist.

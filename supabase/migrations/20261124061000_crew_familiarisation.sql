@@ -96,8 +96,9 @@
 -- Who (gap/04 W11; X1 spec §5): read a vessel's familiarisation with
 -- vessel.crew.familiarisation.view (the person: their own record with
 -- view_own); start and delete with .create; tick another person's items
--- and edit vessel templates with .edit (fleet templates: the company-level
--- answer and fleet reach or company actor); supervise and reopen with
+-- and edit vessel templates with .edit (fleet templates: the company-wide
+-- answer, has_company_capability_for, and fleet reach or an admin of every
+-- vessel, admin_scope_all; D-376); supervise and reopen with
 -- .approve and the department rule. External viewers see only their own
 -- records. The dashboard and onboarding reads need
 -- vessel.crew.crew_list.view (the person: their own onboarding row); each
@@ -157,6 +158,8 @@ BEGIN
      OR to_regprocedure('public.record_is_master(uuid,uuid)') IS NULL
      OR to_regprocedure('public.fleet_reach_for(uuid,uuid)') IS NULL
      OR to_regprocedure('public.is_company_actor(uuid,uuid)') IS NULL
+     OR to_regprocedure('public.admin_scope_all(uuid,uuid)') IS NULL
+     OR to_regprocedure('public.has_company_capability_for(uuid,text,uuid)') IS NULL
      OR to_regprocedure('public.expiry_bucket(date,integer,date,boolean)') IS NULL
      OR to_regprocedure('public.expiry_window_for(uuid,text,uuid)') IS NULL
      OR position('user_is_active' IN pg_get_functiondef('public.get_user_company_id(uuid)'::regprocedure)) = 0 THEN
@@ -1128,7 +1131,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_signed boolean := auth.uid() IS NOT NULL;
-  v_engine boolean := current_setting('storm.crew_engine', true) = 'on';
+  v_engine boolean := coalesce(current_setting('storm.crew_engine', true), '') = 'on';
   v_company uuid;
 BEGIN
   IF v_signed AND NOT v_engine THEN
@@ -1200,7 +1203,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_signed boolean := auth.uid() IS NOT NULL;
-  v_engine boolean := current_setting('storm.crew_engine', true) = 'on';
+  v_engine boolean := coalesce(current_setting('storm.crew_engine', true), '') = 'on';
   v_company uuid;
   v_profile_company uuid;
   v_profile_user uuid;
@@ -1503,8 +1506,8 @@ BEGIN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted',
         DETAIL = 'Changing this vessel''s familiarisation templates needs familiarisation edit access on the vessel.';
     END IF;
-  ELSIF NOT (coalesce(public.has_capability_for(v_uid, 'vessel.crew.familiarisation.edit', v_company, NULL), false)
-             AND (coalesce(public.fleet_reach_for(v_uid, v_company), false) OR coalesce(public.is_company_actor(v_uid, NULL), false))) THEN
+  ELSIF NOT (coalesce(public.has_company_capability_for(v_uid, 'vessel.crew.familiarisation.edit', v_company), false)
+             AND (coalesce(public.fleet_reach_for(v_uid, v_company), false) OR coalesce(public.admin_scope_all(v_uid, v_company), false))) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted',
       DETAIL = 'Fleet-wide familiarisation templates are kept by the fleet office.';
   END IF;
@@ -1962,8 +1965,11 @@ BEGIN
   END IF;
   v_can_create := coalesce(public.crew_vessel_cap('vessel.crew.familiarisation.create', p_vessel_id), false);
   v_can_edit := coalesce(public.crew_vessel_cap('vessel.crew.familiarisation.edit', p_vessel_id), false);
-  v_can_edit_fleet := coalesce(public.has_capability_for(v_uid, 'vessel.crew.familiarisation.edit', v_company, NULL), false)
-                      AND (coalesce(public.fleet_reach_for(v_uid, v_company), false) OR coalesce(public.is_company_actor(v_uid, NULL), false));
+  -- The fleet office (D-376): the company-wide answer, and fleet reach or
+  -- an admin of every vessel (admin_scope_all); a vessel-limited admin is
+  -- not the fleet office.
+  v_can_edit_fleet := coalesce(public.has_company_capability_for(v_uid, 'vessel.crew.familiarisation.edit', v_company), false)
+                      AND (coalesce(public.fleet_reach_for(v_uid, v_company), false) OR coalesce(public.admin_scope_all(v_uid, v_company), false));
 
   WITH mem AS MATERIALIZED (
     SELECT m.profile_id, m.user_id, m.placement_kind, m.join_date,
@@ -2631,7 +2637,7 @@ COMMENT ON FUNCTION public.familiarisation_record_json(uuid, boolean) IS 'Intern
 COMMENT ON FUNCTION public.familiarisation_record_gate(uuid) IS 'Internal: the record of a write RPC, locked, for a caller who may see it (P0002 otherwise).';
 COMMENT ON FUNCTION public.familiarisation_template_json(uuid) IS 'Internal: a template for the page (code, scope, sections, positions, counts of items).';
 COMMENT ON FUNCTION public.crew_onboarding_rows(uuid, uuid, integer) IS 'Internal: the eight onboarding checks and the familiarisations of a vessel''s joiners (gap/04 C18; the signature check reads unknown while user_signature_images is missing).';
-COMMENT ON FUNCTION public.familiarisation_template_save(uuid, uuid, jsonb) IS 'Creates or updates a familiarisation template (X1-10; gap/04 C63, W11, T-15, T-134): name, description, due within, signatures, sections, required positions, active, vessel variant. Vessel template: familiarisation.edit on the vessel; fleet template: company-level edit and fleet reach. Browser RPC.';
+COMMENT ON FUNCTION public.familiarisation_template_save(uuid, uuid, jsonb) IS 'Creates or updates a familiarisation template (X1-10; gap/04 C63, W11, T-15, T-134): name, description, due within, signatures, sections, required positions, active, vessel variant. Vessel template: familiarisation.edit on the vessel; fleet template: the company-wide edit answer (has_company_capability_for, D-376) and fleet reach or an admin of every vessel (admin_scope_all). Browser RPC.';
 COMMENT ON FUNCTION public.familiarisation_start(uuid, uuid, uuid) IS 'Starts a familiarisation from the chosen template for a person of the vessel''s crew (X1-10; the C63 fix). Gate: familiarisation.create. Browser RPC.';
 COMMENT ON FUNCTION public.familiarisation_tick(uuid, boolean, text) IS 'Ticks or unticks a familiarisation item (the person, or familiarisation.edit); the status follows. Browser RPC.';
 COMMENT ON FUNCTION public.familiarisation_sign(uuid, text) IS 'Signs a familiarisation as the crew member (own record, a login) or the supervisor (familiarisation.approve, same department); completes it when the required signatures are there (D-X1-6). Browser RPC.';

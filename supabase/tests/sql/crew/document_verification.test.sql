@@ -281,6 +281,17 @@ SELECT tests.is((SELECT verification_status FROM public.crew_document_verify(pg_
 SELECT tests.is((SELECT verification_status FROM public.crew_document_verify(pg_temp.doc_id('pending_eng1'), 'verified', NULL)), 'verified',
   'verify: a person without a login can have documents verified');
 SELECT tests.reset_role();
+-- D-371: a rejected document is not re-opened by its subject without edit
+-- rights (crew uploads are off on DRAAK here): the direct write that would
+-- return it to unverified is refused, and it stays rejected.
+SELECT tests.as_user(tests.user_id('A.deckhand'));
+SELECT tests.throws_like(format($q$UPDATE public.crew_certificates SET certificate_number = 'RE-OPEN-1' WHERE id = %L$q$, pg_temp.doc_id('deck_eng1')),
+  '42501', 'crew_not_permitted', 'rejected: the subject cannot re-open a rejected document by a direct write (uploads off)');
+SELECT tests.throws_like(format($q$UPDATE public.crew_certificates SET expiry_date = expiry_date + 30 WHERE id = %L$q$, pg_temp.doc_id('deck_eng1')),
+  '42501', 'crew_not_permitted', 'rejected: nor by moving its expiry date');
+SELECT tests.reset_role();
+SELECT tests.results_eq(format('SELECT verification_status, verification_note FROM public.crew_certificates WHERE id = %L', pg_temp.doc_id('deck_eng1')),
+  $q$VALUES ('rejected'::text, 'The scan is unreadable'::text)$q$, 'rejected: the document stays rejected with its reason');
 SELECT tests.results_eq(
   $q$SELECT must_act_user_ids[1], severity, body FROM public.notification_outbox WHERE type_key = 'crew_document_decided' ORDER BY created_at, id$q$,
   format($q$VALUES (%L::uuid, 'success'::text, 'Checked against the file and the details you entered.'::text),
@@ -290,6 +301,11 @@ SELECT tests.results_eq(
   'decided: a new decision is a new notice with the note as its body; a person without a login gets none');
 
 -- ------------------------------------------------------------ 6. crew_certificates_review_notify
+
+-- The crew's own legacy writes below need crew uploads on for their vessel
+-- (D-371: the guard holds a direct write to crew_document_may_write).
+INSERT INTO public.vessel_crew_settings (vessel_id, crew_uploads_enabled) VALUES (tests.vessel_id('A.dra'), true)
+ON CONFLICT (vessel_id) DO UPDATE SET crew_uploads_enabled = true;
 
 -- D-128: with crew_document_review_needed missing, an upload still saves.
 SAVEPOINT review_missing;

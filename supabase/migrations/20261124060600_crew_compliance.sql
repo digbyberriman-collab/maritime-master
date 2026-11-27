@@ -171,6 +171,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261124060600_crew_compliance needs the live training and familiarisation tables';
   END IF;
   IF to_regprocedure('public.has_capability_for(uuid,text,uuid,uuid)') IS NULL
+     OR to_regprocedure('public.has_company_capability_for(uuid,text,uuid)') IS NULL
      OR to_regprocedure('public.user_belongs_to_company(uuid,uuid)') IS NULL
      OR to_regprocedure('public.get_user_company_id(uuid)') IS NULL
      OR to_regprocedure('public.my_profile_id()') IS NULL
@@ -1288,7 +1289,7 @@ BEGIN
     'vessel_id', p_vessel_id,
     'company_id', v_company,
     'can_admin', coalesce(public.crew_vessel_cap('vessel.crew.crew_compliance.admin', p_vessel_id), false),
-    'can_admin_company', coalesce(public.has_capability_for(auth.uid(), 'vessel.crew.crew_compliance.admin', v_company, NULL), false),
+    'can_admin_company', coalesce(public.has_company_capability_for(auth.uid(), 'vessel.crew.crew_compliance.admin', v_company), false),
     'settings', v_settings,
     'positions', v_positions,
     'rows', v_rows,
@@ -1809,8 +1810,9 @@ $$;
 -- ---------------------------------------------------------------- company-level writes (the company-level crew_compliance.admin)
 
 -- The company-level gate: a signed-in, active caller of a company, no
--- external viewer, holding vessel.crew.crew_compliance.admin at company
--- level (has_capability_for with no vessel). Returns the company.
+-- external viewer, holding vessel.crew.crew_compliance.admin for the whole
+-- company (has_company_capability_for, D-376: a role bound to one vessel
+-- does not count). Returns the company.
 CREATE OR REPLACE FUNCTION public.crew_compliance_company_gate(p_detail text)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -1827,7 +1829,7 @@ BEGIN
   END IF;
   v_company := public.get_user_company_id(v_uid);
   IF v_company IS NULL OR public.crew_caller_is_external()
-     OR NOT coalesce(public.has_capability_for(v_uid, 'vessel.crew.crew_compliance.admin', v_company, NULL), false) THEN
+     OR NOT coalesce(public.has_company_capability_for(v_uid, 'vessel.crew.crew_compliance.admin', v_company), false) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted', DETAIL = p_detail;
   END IF;
   RETURN v_company;
@@ -2212,14 +2214,14 @@ COMMENT ON FUNCTION public.crew_compliance_summary_for(uuid[], date, uuid) IS 'I
 COMMENT ON FUNCTION public.crew_requirement_held_by(uuid, date) IS 'Internal: per requirement of the vessel, the crew members today (any position) holding a satisfier that counts, or a completed familiarisation record (the configuration''s "held by").';
 COMMENT ON FUNCTION public.crew_requirement_set_add(uuid, text, uuid) IS 'Internal: ensures the STCW basic (PST, FPFF, EFA, PSSR) or STCW V/2 passenger (crowd, crisis, passenger safety) rows on the vessel by seed key, ticked for every listed position. Returns the rows and ticks added.';
 COMMENT ON FUNCTION public.crew_requirement_admin_gate(uuid) IS 'Internal: the write gate of the requirement RPCs: vessel.crew.crew_compliance.admin on the vessel (P0002 unknown vessel, 42501), no external viewer. Returns the vessel''s company.';
-COMMENT ON FUNCTION public.crew_compliance_company_gate(text) IS 'Internal: the company-level write gate (tenant document types, company satisfaction rules): an active caller of a company, no external viewer, vessel.crew.crew_compliance.admin at company level (42501 with the given sentence). Returns the company.';
+COMMENT ON FUNCTION public.crew_compliance_company_gate(text) IS 'Internal: the company-level write gate (tenant document types, company satisfaction rules): an active caller of a company, no external viewer, vessel.crew.crew_compliance.admin for the whole company (has_company_capability_for, D-376: a role bound to one vessel does not count; 42501 with the given sentence). Returns the company.';
 COMMENT ON FUNCTION public.crew_requirements_seed() IS 'Seed (service role; run once by 20261124060600): each vessel never seeded and with no requirement rows gets its training_matrix requirements (course -> document type, rank -> position), else the STCW basic set for its listed positions; the vessel is marked in vessel_crew_settings.requirements_seeded_at. Returns the counts.';
 COMMENT ON FUNCTION public.crew_requirement_status_rows() IS 'The requirement status rows of the vessels where the caller holds vessel.crew.crew_compliance.view, today; nothing for an external viewer, without a JWT or when inactive. Read through the security-invoker view crew_requirement_status.';
 COMMENT ON FUNCTION public.crew_compliance_summary_rows() IS 'The compliance summaries of the vessels where the caller holds vessel.crew.crew_compliance.view, today; nothing for an external viewer, without a JWT or when inactive. Read through the security-invoker view crew_compliance_summary.';
 COMMENT ON FUNCTION public.crew_vessel_compliance(uuid) IS 'The compliance summary of the vessel''s crew today (gap/04 C5, C35): vessel.crew.crew_compliance.view (P0002 unknown vessel, 42501), no external viewer.';
 COMMENT ON FUNCTION public.crew_vessel_requirement_status(uuid, uuid) IS 'The requirement status rows of the vessel''s crew today, or of one person: vessel.crew.crew_compliance.view (no external viewer), or one''s own rows with vessel.crew.crew_certificates.view_own; P0002 unknown vessel or a person of another company.';
 COMMENT ON FUNCTION public.crew_compliance_for_vessels(uuid[]) IS 'Fleet report R5 (platform plan contract 5): the compliance summaries of the vessels; every id must be one the caller holds vessel.crew.crew_compliance.view on, else the whole call is refused (42501 vessel_out_of_reach); no external viewer; 22023 vessels_required (NULL), too_many_vessels (over 500); an empty list answers nothing. Columns frozen in src/modules/crew/types/db.pending.ts.';
-COMMENT ON FUNCTION public.crew_requirements_config(uuid) IS 'The vessel''s requirement configuration (gap/04 C33): can_admin, can_admin_company, the typed settings, the positions (listed or ticked), the rows with options, ticks and held-by counts, the vessel''s familiarisation templates. vessel.crew.crew_compliance.view, no external viewer.';
+COMMENT ON FUNCTION public.crew_requirements_config(uuid) IS 'The vessel''s requirement configuration (gap/04 C33): can_admin, can_admin_company (the company-wide answer, D-376), the typed settings, the positions (listed or ticked), the rows with options, ticks and held-by counts, the vessel''s familiarisation templates. vessel.crew.crew_compliance.view, no external viewer.';
 COMMENT ON FUNCTION public.crew_requirement_row_save(uuid, uuid, jsonb) IS 'Creates or changes a crew requirement of the vessel (group, label, kind, sort order; options replace the options; position_ids replace the ticks). vessel.crew.crew_compliance.admin. P0002 requirement_not_found; 22023 refusals with HINT naming the field. Returns the row.';
 COMMENT ON FUNCTION public.crew_requirement_row_delete(uuid, uuid) IS 'Removes a crew requirement of the vessel with its options and ticks. vessel.crew.crew_compliance.admin. P0002 requirement_not_found. Returns its id.';
 COMMENT ON FUNCTION public.crew_requirement_cell_set(uuid, jsonb) IS 'Sets requirement matrix cells of the vessel in one transaction ([{row_id, position_id, required}], 1 to 2000, each once). vessel.crew.crew_compliance.admin. P0002 requirement_not_found; 22023 cells_required / cells_too_many / cells_invalid / cells_duplicate / position_unknown. Returns the number of cells applied.';

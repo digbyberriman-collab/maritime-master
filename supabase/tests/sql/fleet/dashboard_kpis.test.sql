@@ -176,6 +176,17 @@ SELECT tests.results_eq(
          tests.id('ca:7'), tests.vessel_id('A.gam')),
   'open corrective actions: vessel through the incident, else the audit; company audits and actions with neither are fleet-level; closed and B''s left out');
 
+-- The sections below test the legacy hours-of-rest rule (a failing check
+-- is a breach crew-day): X1's breach review columns are hidden for them
+-- (rolled back with the file) and shown again for the D-380 section at the
+-- end, where breach days come from X1's breach review as in the R9 report.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'work_rest_non_conformities' AND column_name = 'review_outcome') THEN
+    ALTER TABLE public.work_rest_non_conformities RENAME COLUMN review_outcome TO review_outcome_x380hidden;
+  END IF;
+END
+$$;
 SELECT tests.results_eq(
   format($q$SELECT vessel_id, crew_id, on_day, breach, near FROM public.fleet_dashboard_hor_crew_days(%L, ARRAY[%L, %L, %L]::uuid[], current_date - 29, current_date)$q$,
          tests.company_id('A'), tests.vessel_id('A.dra'), tests.vessel_id('A.hyd'), tests.vessel_id('A.gam')),
@@ -437,3 +448,82 @@ FROM unnest(ARRAY[
 SELECT tests.ok(NOT p.prosecdef OR p.proconfig @> ARRAY['search_path=public'], 'definers set search_path: ' || p.proname)
 FROM pg_proc AS p JOIN pg_namespace AS n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public' AND (p.proname LIKE 'fleet_dashboard_%' OR p.proname = 'fleet_vessel_comparison');
+
+-- ------------------------------------------------------------ hours of rest from X1's breach review (D-380)
+
+-- X1's breach review columns back (stubs when X1 is not in the build), and
+-- its breach list: the failing-check day -3 of A.crew_hyd was dismissed in
+-- review, day -5 is a live breach, day -8 a periods-only breach with no
+-- failing check; the mover's day -2 is a breach of its DRAAK month and day
+-- -15 one with no vessel (the HYDRA assignment covering it); a superseded
+-- one and B's crew never count.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'work_rest_non_conformities' AND column_name = 'review_outcome_x380hidden') THEN
+    ALTER TABLE public.work_rest_non_conformities RENAME COLUMN review_outcome_x380hidden TO review_outcome;
+  END IF;
+END
+$$;
+ALTER TABLE public.work_rest_non_conformities ADD COLUMN IF NOT EXISTS vessel_id uuid, ADD COLUMN IF NOT EXISTS breach_day date,
+  ADD COLUMN IF NOT EXISTS is_serious boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS superseded_at timestamptz,
+  ADD COLUMN IF NOT EXISTS review_outcome text;
+INSERT INTO public.work_rest_non_conformities (id, crew_id, submission_id, rule_code, rule_description, severity, window_start, window_end,
+                                               measured_value, threshold_value, status, vessel_id, breach_day, is_serious, superseded_at, review_outcome)
+SELECT tests.id('nc380:' || x.k), tests.user_id(x.crew), CASE WHEN x.sub IS NULL THEN NULL ELSE tests.id(x.sub) END, x.rule, 'Rest rule', 'high',
+       ((current_date - x.d)::timestamp AT TIME ZONE 'UTC'), ((current_date - x.d + 1)::timestamp AT TIME ZONE 'UTC'),
+       8, 10, x.status, CASE WHEN x.v IS NULL THEN NULL ELSE tests.vessel_id(x.v) END, CASE WHEN x.bd THEN current_date - x.d END,
+       false, CASE WHEN x.superseded THEN now() END, x.outcome
+FROM (VALUES
+  ('d3', 'A.crew_hyd', 'sub:hyd', 'REST_24H_MIN', 3, 'dismissed', 'A.hyd', true, false, 'dismissed'),      -- dismissed; its failing checks c1, c2 stay
+  ('d5', 'A.crew_hyd', NULL, 'REST_24H_MIN', 5, 'open', 'A.hyd', true, false, NULL),                       -- live breach (check c3 too)
+  ('d8', 'A.crew_hyd', NULL, 'REST_PERIODS_MAX', 8, 'reviewed', NULL, false, false, 'accepted'),           -- periods only, no failing check; HYDRA by the assignment
+  ('d8s', 'A.crew_hyd', NULL, 'REST_24H_MIN', 9, 'reviewed', 'A.hyd', true, true, 'accepted'),             -- superseded
+  ('m2', 'A.mover', 'sub:mover', 'REST_24H_MIN', 2, 'open', NULL, false, false, NULL),                     -- DRAAK by its month
+  ('m15', 'A.mover', NULL, 'REST_INTERVAL_MAX', 15, 'open', NULL, false, false, NULL),                     -- HYDRA by the ended assignment covering the day
+  ('b1', 'B.crew', NULL, 'REST_24H_MIN', 1, 'open', 'B.lev', true, false, NULL)                            -- company B
+) AS x(k, crew, sub, rule, d, status, v, bd, superseded, outcome);
+
+SELECT tests.results_eq(
+  format($q$SELECT vessel_id, crew_id, on_day, breach, near FROM public.fleet_dashboard_hor_crew_days(%L, ARRAY[%L, %L]::uuid[], current_date - 29, current_date) ORDER BY 3, 1, 2$q$,
+         tests.company_id('A'), tests.vessel_id('A.dra'), tests.vessel_id('A.hyd')),
+  format($q$VALUES (%L::uuid, %L::uuid, current_date - 15, true, false), (%L, %L, current_date - 8, true, false), (%L, %L, current_date - 5, true, false),
+                   (%L, %L, current_date - 2, true, true), (%L, %L, current_date - 1, false, true)$q$,
+         tests.vessel_id('A.hyd'), tests.user_id('A.mover'), tests.vessel_id('A.hyd'), tests.user_id('A.crew_hyd'),
+         tests.vessel_id('A.hyd'), tests.user_id('A.crew_hyd'), tests.vessel_id('A.dra'), tests.user_id('A.mover'),
+         tests.vessel_id('A.hyd'), tests.user_id('A.crew_hyd')),
+  'D-380 crew-days: the dismissed day is gone though its failing checks stay, the periods-only day counts, vessels by the NC, its month, else the assignment; near joined by crew-day');
+
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+CREATE TEMP TABLE x380 ON COMMIT DROP AS
+SELECT public.fleet_dashboard_kpis(ARRAY[tests.vessel_id('A.dra'), tests.vessel_id('A.hyd')]) AS k,
+       public.fleet_report_hours_of_rest(ARRAY[tests.vessel_id('A.dra'), tests.vessel_id('A.hyd')]) AS r;
+CREATE TEMP TABLE x380_cmp ON COMMIT DROP AS SELECT * FROM public.fleet_vessel_comparison(ARRAY[tests.vessel_id('A.dra'), tests.vessel_id('A.hyd')]);
+SELECT tests.reset_role();
+GRANT SELECT ON x380, x380_cmp TO PUBLIC;
+SELECT tests.is((SELECT (k #>> '{tiles,hours_of_rest,breach_days}')::int FROM x380), 4,
+                'D-380 tile: 4 breach crew-days (HYDRA 3, DRAAK 1); the dismissed one with its failing check counts 0, the periods-only one 1');
+SELECT tests.is((SELECT (k #>> '{tiles,hours_of_rest,near_threshold}')::int FROM x380), 1, 'D-380 tile: near threshold on a crew-day without a breach');
+SELECT tests.is((SELECT r ->> 'source' FROM x380), 'breach_review', 'the R9 report reads X1''s breach review');
+SELECT tests.is((SELECT (k #>> '{tiles,hours_of_rest,breach_days}')::int FROM x380), (SELECT (r #>> '{totals,breach_days}')::int FROM x380),
+                'D-380: the tile''s breach days equal the R9 report''s totals for the same vessels and the 30 days ending today');
+SELECT tests.is((SELECT (hours_of_rest ->> 'breach_days')::int FROM x380_cmp WHERE vessel_id = tests.vessel_id('A.hyd')), 3, 'D-380 comparison: HYDRA 3 breach days');
+SELECT tests.is((SELECT (hours_of_rest ->> 'breach_days')::int FROM x380_cmp WHERE vessel_id = tests.vessel_id('A.dra')), 1, 'D-380 comparison: DRAAK 1');
+SELECT tests.is((SELECT sum((hours_of_rest ->> 'breach_days')::int) FROM x380_cmp)::int, (SELECT (r #>> '{totals,breach_days}')::int FROM x380),
+                'D-380: the comparison''s breach days add up to the report''s');
+
+-- ------------------------------------------------------------ documents by source (C-1, D-381)
+
+SELECT tests.is((SELECT (d #>> '{tiles,documents,parts,expiring_vessel_certificates}')::int + (d #>> '{tiles,documents,parts,expiring_crew_items}')::int FROM fm),
+                (SELECT (d #>> '{tiles,documents,parts,expiring}')::int FROM fm), 'C-1: the expiring parts by source sum to expiring');
+SELECT tests.is((SELECT (d #>> '{tiles,documents,parts,expiring_vessel_certificates}')::int FROM fm), 1, 'C-1: one vessel certificate expiring (HYDRA''s)');
+SELECT tests.is((SELECT (d #>> '{tiles,documents,parts,expiring_crew_items}')::int FROM fm), 2, 'C-1: two crew items expiring (the master''s STCW and the passport)');
+SELECT tests.is_empty(
+  $q$SELECT vessel_id FROM fm_cmp
+     WHERE documents IS NOT NULL
+       AND ((documents ->> 'expired_vessel_certificates')::int + (documents ->> 'expired_crew_items')::int IS DISTINCT FROM (documents ->> 'expired')::int
+            OR (documents ->> 'expiring_vessel_certificates')::int + (documents ->> 'expiring_crew_items')::int IS DISTINCT FROM (documents ->> 'expiring')::int)$q$,
+  'C-1: per vessel the comparison''s documents by source sum to expired and expiring');
+SELECT tests.ok((SELECT bool_and(documents ? 'expired_vessel_certificates' AND documents ? 'expired_crew_items' AND documents ? 'expiring_vessel_certificates'
+                                 AND documents ? 'expiring_crew_items' AND documents ? 'value' AND documents ? 'endorsements_overdue')
+                 FROM fm_cmp WHERE documents IS NOT NULL),
+                'C-1: the comparison keeps its keys and adds the four by source');

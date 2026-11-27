@@ -801,8 +801,38 @@ SELECT tests.reset_role();
 
 -- ------------------------------------------------------------ 9. RLS of the request periods
 
+-- D-377: the requester and the vessel's schedulers and leave approvers
+-- read a request's periods (they name the leave type: medical,
+-- compassionate ...); other crew of the company, external viewers, another
+-- tenant, inactive users and anon read none.
+SELECT tests.seed_role('x19_leave_only', 'vessel');
+INSERT INTO public.role_permissions (role_id, module_key, permission, scope)
+SELECT r.id, 'crew.approve_leave', 'view', 'vessel' FROM public.roles AS r WHERE r.name = 'x19_leave_only';
+SELECT pg_temp.crew('A.x19_leave_only', 'A.dra', 'Purser');
+SELECT tests.seed_rbac_role('A.x19_leave_only', 'x19_leave_only', 'A.dra');
+SELECT tests.ok(public.has_capability_for(tests.user_id('A.x19_leave_only'), 'hris.leave_rotation.leave_requests.approve', tests.company_id('A'), tests.vessel_id('A.dra'))
+                AND NOT public.has_capability_for(tests.user_id('A.x19_leave_only'), 'vessel.crew.crew_scheduling.view', tests.company_id('A'), tests.vessel_id('A.dra')),
+                'RLS world: a leave approver without scheduling access');
+SELECT tests.ok(NOT public.has_capability_for(tests.user_id('A.crew_hyd'), 'vessel.crew.crew_scheduling.view', tests.company_id('A'), tests.vessel_id('A.dra'))
+                AND NOT public.has_capability_for(tests.user_id('A.x19_deck'), 'vessel.crew.crew_scheduling.view', tests.company_id('A'), tests.vessel_id('A.dra')),
+                'RLS world: HYDRA crew and a DRAAK deckhand have no scheduling access on DRAAK');
+CREATE FUNCTION pg_temp.req1_periods() RETURNS bigint LANGUAGE sql STABLE AS $$
+  SELECT count(*) FROM public.crew_leave_request_periods WHERE request_id = (SELECT id FROM out_ids WHERE k = 'req1')
+$$;
+SELECT tests.as_user(tests.user_id('A.x19_stew'));
+SELECT tests.is(pg_temp.req1_periods(), 2::bigint, 'the requester reads their request''s periods');
 SELECT tests.as_user(tests.user_id('A.x19_approver'));
-SELECT tests.is((SELECT count(*) FROM public.crew_leave_request_periods WHERE request_id = (SELECT id FROM out_ids WHERE k = 'req1')), 2::bigint, 'company members read a request''s periods');
+SELECT tests.is(pg_temp.req1_periods(), 2::bigint, 'a scheduler and leave approver of the vessel reads them');
+SELECT tests.as_user(tests.user_id('A.x19_viewer'));
+SELECT tests.is(pg_temp.req1_periods(), 2::bigint, 'a planner viewer (scheduling view) of the vessel reads them');
+SELECT tests.as_user(tests.user_id('A.x19_leave_only'));
+SELECT tests.is(pg_temp.req1_periods(), 2::bigint, 'a leave approver of the vessel reads them');
+SELECT tests.as_user(tests.user_id('A.crew_hyd'));
+SELECT tests.is((SELECT count(*) FROM public.crew_leave_request_periods), 0::bigint, 'crew of another vessel without scheduling access read none (D-377)');
+SELECT tests.as_user(tests.user_id('A.x19_deck'));
+SELECT tests.is(pg_temp.req1_periods(), 0::bigint, 'a shipmate without scheduling access reads none of another person''s request');
+SELECT tests.as_user(tests.user_id('A.x19_ext'));
+SELECT tests.is(pg_temp.req1_periods(), 0::bigint, 'an external viewer reads none, whatever their role');
 SELECT tests.as_user(tests.user_id('B.admin'));
 SELECT tests.is((SELECT count(*) FROM public.crew_leave_request_periods), 0::bigint, 'another tenant reads none');
 SELECT tests.as_user(tests.user_id('A.disabled'));

@@ -58,7 +58,9 @@
 -- vessel.crew.crew_certificates.view on vessels of the person's structural
 -- set (a current or planned assignment, or the pending placement; X1 spec
 -- §3). The company-wide legacy read policy is dropped; the legacy write
--- policies (hr_can_write_crew_record: the person or an HR editor) stay.
+-- policies (hr_can_write_crew_record: the person or an HR editor) stay, and
+-- the guard holds every signed-in direct write to crew_document_may_write
+-- (D-371).
 --
 -- Who may add or change one (crew_document_may_write, crew_document_save):
 -- a legacy HR editor (hr_can_edit), a holder of
@@ -88,8 +90,14 @@
 -- change only the legacy columns: every new column, verification, alerts and
 -- removal included, is the definers' (42501 crew_document_engine_only), and
 -- a reviewed or removed document is never hard-deleted (42501
--- crew_document_delete_refused). The service role and no-JWT maintenance
--- are exempt. The legacy status column is no longer read: the state is
+-- crew_document_delete_refused). Their direct INSERT, UPDATE and DELETE
+-- follow the same rights as crew_document_save and crew_document_delete
+-- (D-371, 42501 crew_not_permitted): an insert needs
+-- crew_document_may_write 'create', an update 'edit', a delete 'delete' or
+-- the person's own upload within 24 hours, so the crew-uploads setting
+-- cannot be bypassed through the legacy write policies (they stay; the
+-- guard is the rule). The service role, no-JWT maintenance and X5's
+-- definers (storm.fleet_tx) are exempt. The legacy status column is no longer read: the state is
 -- computed.
 --
 -- Expiry after issue. Enforced by the guard for every new row and every
@@ -828,7 +836,12 @@ AS $$
 DECLARE
   v_uid uuid := auth.uid();
   v_engine boolean := coalesce(current_setting('storm.crew_engine', true), '') = 'on';
+  -- X5's definers (development_transition's legacy qualification row) run
+  -- under storm.fleet_tx: their writes are decided there, not by the
+  -- caller's document rights (D-371).
+  v_fleet_tx boolean := coalesce(current_setting('storm.fleet_tx', true), '') = 'on';
   v_caller_rules boolean;
+  v_old_profile uuid;
   v_profile_id uuid;
   v_profile_user uuid;
   v_profile_company uuid;
@@ -853,6 +866,18 @@ BEGIN
        AND (OLD.verification_status IS DISTINCT FROM 'unverified' OR OLD.deleted_at IS NOT NULL) THEN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_document_delete_refused',
         DETAIL = 'A reviewed or removed document is kept. Remove it from the crew profile instead.';
+    END IF;
+    -- The direct delete follows crew_document_delete (D-371): a document
+    -- editor of the person, or the person who added it within 24 hours
+    -- while they may still add documents for that person.
+    IF v_caller_rules AND NOT v_fleet_tx AND pg_trigger_depth() = 1 THEN
+      v_old_profile := coalesce(OLD.profile_id, (SELECT p.id FROM public.profiles AS p WHERE p.user_id = OLD.user_id));
+      IF NOT (coalesce(public.crew_document_may_write(v_uid, v_old_profile, 'delete'), false)
+              OR (coalesce(OLD.created_by = v_uid AND OLD.created_at > now() - interval '24 hours', false)
+                  AND coalesce(public.crew_document_may_write(v_uid, v_old_profile, 'create'), false))) THEN
+        RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted',
+          DETAIL = 'Only the person who added this document, within 24 hours, or a crew document editor can remove it.';
+      END IF;
     END IF;
     RETURN OLD;
   END IF;
@@ -905,6 +930,28 @@ BEGIN
   IF v_caller_rules AND NEW.company_id IS DISTINCT FROM public.get_user_company_id(v_uid) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_document_scope_refused',
       DETAIL = 'You can only keep documents of your own company''s crew.';
+  END IF;
+  -- The table write path follows crew_document_save (D-371): a signed-in
+  -- writer adds or changes a document only with crew_document_may_write
+  -- (an HR editor, crew_certificates.create / .edit on the person's vessel,
+  -- or the person with crew uploads on). The legacy write policies stay; this
+  -- is the rule, so the crew-uploads setting cannot be bypassed by a direct
+  -- write. Foreign-key cascades and nested triggers are exempt.
+  IF v_caller_rules AND NOT v_fleet_tx AND pg_trigger_depth() = 1 THEN
+    IF TG_OP = 'INSERT' THEN
+      IF NOT coalesce(public.crew_document_may_write(v_uid, NEW.profile_id, 'create'), false) THEN
+        RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted',
+          DETAIL = 'Crew uploads are off for this person''s vessel, or you cannot add documents for this person.';
+      END IF;
+    ELSE
+      v_old_profile := coalesce(OLD.profile_id, (SELECT p.id FROM public.profiles AS p WHERE p.user_id = OLD.user_id));
+      IF NOT coalesce(public.crew_document_may_write(v_uid, NEW.profile_id, 'edit'), false)
+         OR (v_old_profile IS DISTINCT FROM NEW.profile_id
+             AND NOT coalesce(public.crew_document_may_write(v_uid, v_old_profile, 'edit'), false)) THEN
+        RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted',
+          DETAIL = 'Crew uploads are off for this person''s vessel, or you cannot change this person''s documents.';
+      END IF;
+    END IF;
   END IF;
 
   -- A legacy row names its type through the legacy map.
@@ -1965,7 +2012,10 @@ CREATE POLICY vessel_crew_settings_read ON public.vessel_crew_settings
 -- build-out file) is replaced by the scoped read; the RESTRICTIVE pin keeps
 -- every read and write of a signed-in caller inside their company. The
 -- legacy write policies ("Crew or HR can insert / update / delete crew
--- certificates", hr_can_write_crew_record) stay as they are.
+-- certificates", hr_can_write_crew_record) stay as they are; the guard
+-- (crew_certificates_guard) holds each signed-in direct write to
+-- crew_document_may_write, so the person adds or changes their own
+-- documents only with crew uploads on (D-371).
 DROP POLICY IF EXISTS "Users can view crew certificates in their company" ON public.crew_certificates;
 DROP POLICY IF EXISTS crew_documents_select_scoped ON public.crew_certificates;
 CREATE POLICY crew_documents_select_scoped ON public.crew_certificates
@@ -2042,7 +2092,7 @@ COMMENT ON FUNCTION public.crew_document_visible_profile_ids() IS 'X1 caller-onl
 COMMENT ON FUNCTION public.crew_document_file_readable(uuid, uuid) IS 'Storage and RPC predicate (PR-X1-F, D-X1-18): whether the user may read the person''s documents and files; the rule of crew_document_visible_profile_ids() for any user. Internal (service role; 20261124000100''s gate and the X1 definers).';
 COMMENT ON FUNCTION public.crew_document_file_writable(uuid, uuid) IS 'Storage predicate (PR-X1-F, D-X1-18): whether the user may add or change a document of the person (crew_document_may_write create or edit). Internal (service role; 20261124000100''s gate).';
 COMMENT ON FUNCTION public.crew_document_may_write(uuid, uuid, text) IS 'Internal: whether the user may add (create), change (edit) or remove (delete) a document of the person: active, same company, no external viewer, and a legacy HR editor, or vessel.crew.crew_certificates.create / .edit (delete: .edit) on a vessel of the person''s structural set, or (create, edit) the person with crew uploads on for one of their vessels and view_own there.';
-COMMENT ON FUNCTION public.crew_certificates_guard() IS 'Trigger (every writer): fills the person, login and company from each other, keeps a document in its person''s company (23514), names a legacy row''s type through the legacy map, refuses an expiry before the issue date on a new row or changed date (22023 crew_document_dates_invalid) and returns a reviewed document to unverified on a material change. Signed-in writers outside storm.crew_engine: own company only, the subject never moves, the new columns stay the X1 definers'' (42501 crew_document_engine_only), and a reviewed or removed document is never hard-deleted (42501 crew_document_delete_refused).';
+COMMENT ON FUNCTION public.crew_certificates_guard() IS 'Trigger (every writer): fills the person, login and company from each other, keeps a document in its person''s company (23514), names a legacy row''s type through the legacy map, refuses an expiry before the issue date on a new row or changed date (22023 crew_document_dates_invalid) and returns a reviewed document to unverified on a material change. Signed-in writers outside storm.crew_engine: own company only, the subject never moves, the new columns stay the X1 definers'' (42501 crew_document_engine_only), a reviewed or removed document is never hard-deleted (42501 crew_document_delete_refused), and each direct write needs crew_document_may_write (insert: create; update: edit; delete: delete, or the person''s own upload within 24 hours; 42501 crew_not_permitted; D-371). The service role, no-JWT maintenance and X5''s definers (storm.fleet_tx) skip the caller rules on rights.';
 COMMENT ON FUNCTION public.crew_document_passport_mirror(uuid, boolean) IS 'Internal: mirrors the person''s crew-report passport into profiles.passport_number, passport_expiry and passport_country (only what differs), or clears them with p_clear when no flagged passport is left.';
 COMMENT ON FUNCTION public.crew_certificates_passport_sync() IS 'Trigger AFTER INSERT / UPDATE / DELETE on crew_certificates: re-mirrors the crew-report passport into profiles when it is added, changed, unflagged or removed (gap/04 C26).';
 COMMENT ON FUNCTION public.crew_documents_for_profile(uuid) IS 'A person''s documents with their state (gap/04 C24, C29, W3; TS documentState.ts): type and tab, fields, file, verification, alerts, window (expiry_window_for), bucket, days left, endorsement state and state (not_uploaded > missing_date > bucket), and the caller''s edit / remove rights. Gate: crew_document_file_readable (P0002 unknown or foreign person, 42501 otherwise).';

@@ -550,7 +550,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_flag boolean := current_setting('storm.fleet_tx', true) = 'on';
+  v_flag boolean := coalesce(current_setting('storm.fleet_tx', true), '') = 'on';
   v_category text;
 BEGIN
   IF TG_OP = 'UPDATE' AND (NEW.id IS DISTINCT FROM OLD.id OR NEW.company_id IS DISTINCT FROM OLD.company_id

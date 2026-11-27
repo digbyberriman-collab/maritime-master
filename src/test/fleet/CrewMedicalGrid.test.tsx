@@ -113,7 +113,7 @@ const ROWS: FleetCrewMedicalStatusRow[] = [
   person(1, { person_name: 'Bosun', status: 'critical', reasons: ['eng1_expired', 'serious_rest_breach'], eng1_state: 'expired', eng1_expires_on: '2026-11-01', rest_noncompliant_30d: 2, serious_rest_breach_30d: 1 }),
   person(2, { person_name: 'Chief Stew', status: 'critical', reasons: ['eng1_unfit'], eng1_state: 'unfit', eng1_expires_on: null, eng1_is_equivalent: null, vessel_id: 'v-hyd', vessel_name: 'HYDRA', vessel_code: 'HYD' }),
   person(3, { person_name: 'Deckhand', status: 'at_risk', reasons: ['booster_due'], boosters_due: 1, condition_flag: null, allergy_flag: null }),
-  person(4, { person_name: 'Engineer', status: 'incomplete', reasons: ['no_health_record'], has_health_record: false, eng1_state: 'missing', eng1_expires_on: null, eng1_is_equivalent: null, vaccines_valid: null, vaccines_expired: null, vaccines_missing: null, boosters_due: null, occ_health_state: null, condition_flag: null, allergy_flag: null }),
+  person(4, { person_name: 'Engineer', status: 'critical', reasons: ['eng1_missing', 'no_health_record'], has_health_record: false, eng1_state: 'missing', eng1_expires_on: null, eng1_is_equivalent: null, vaccines_valid: null, vaccines_expired: null, vaccines_missing: null, boosters_due: null, occ_health_state: null, condition_flag: null, allergy_flag: null }),
   person(5, { person_name: 'Joining Cook', status: 'ok', is_planned: true, join_date: '2026-12-10', rest_tracked: false, rest_noncompliant_30d: null, serious_rest_breach_30d: null, eng1_is_equivalent: true, allergy_flag: true }),
 ];
 
@@ -213,7 +213,9 @@ describe('the medical read (pure)', () => {
     const table = buildExportTable(MEDICAL_EXPORT_COLUMNS, ROWS.map(toCrewMedicalRow));
     expect(table.headers).toContain('Reasons');
     expect(table.rows[0][table.headers.indexOf('Reasons')]).toBe('ENG1 expired; Serious rest breach');
-    expect(table.rows[3][table.headers.indexOf('ENG1')]).toBe('Not known');
+    // A missing ENG1 reads None on file with or without a Health record (D-385).
+    expect(table.rows[3][table.headers.indexOf('ENG1')]).toBe('None on file');
+    expect(table.rows[3][table.headers.indexOf('Reasons')]).toBe('No ENG1; No health record');
     expect(table.rows[4][table.headers.indexOf('Joining on')]).toBe('2026-12-10');
   });
 });
@@ -227,7 +229,9 @@ describe('the fleet grid', () => {
     expect(callsOf('fleet_crew_medical_status')[0]).toMatchObject({ p_vessel_ids: null, p_status: null });
     const names = bodyRows().map((r) => within(r).getAllByRole('cell')[0].textContent ?? '');
     expect(names[0]).toMatch(/^Bosun/);
-    expect(names[1]).toMatch(/^Chief Stew/);
+    // The three critical people first (the Engineer has no ENG1 and no Health record, D-385), then at risk, then ok.
+    for (const name of [/^Chief Stew/, /^Engineer/]) expect(names.slice(1, 3).some((n) => name.test(n))).toBe(true);
+    expect(names[3]).toMatch(/^Deckhand/);
     expect(names.at(-1)).toMatch(/^Joining Cook/);
     expect(screen.getByTestId('medical-updated').textContent).toMatch(/^Updated .* UTC$/);
   });
@@ -254,13 +258,13 @@ describe('the fleet grid', () => {
     await screen.findByRole('table');
     const tiles = screen.getByRole('group', { name: 'Crew by medical status' });
     const critical = within(tiles).getByRole('link', { name: /Critical/ });
-    expect(critical.textContent).toMatch(/2/);
+    expect(critical.textContent).toMatch(/3/);
     expect(within(tiles).getByRole('link', { name: /At risk/ }).textContent).toMatch(/1/);
-    expect(within(tiles).getByRole('link', { name: /Incomplete/ }).textContent).toMatch(/1/);
+    expect(within(tiles).getByRole('link', { name: /Incomplete/ }).textContent).toMatch(/0/);
     expect(within(tiles).getByRole('link', { name: /Up to date/ }).textContent).toMatch(/1/);
     fireEvent.click(critical);
     await waitFor(() => expect(location()).toBe('/fleet/medical?status=critical'));
-    await waitFor(() => expect(bodyRows()).toHaveLength(2));
+    await waitFor(() => expect(bodyRows()).toHaveLength(3));
     expect(within(tiles).getByRole('link', { name: /Critical/ }).textContent).toMatch(/Shown below/);
     fireEvent.click(within(tiles).getByRole('link', { name: /Critical/ }));
     await waitFor(() => expect(location()).toBe('/fleet/medical'));
@@ -287,7 +291,12 @@ describe('the fleet grid', () => {
     answerAll();
     renderGrid();
     await screen.findByRole('table');
-    const [bosun, stew, deckhand, engineer, cook] = bodyRows();
+    const row = (name: string) => {
+      const found = bodyRows().find((r) => (within(r).getAllByRole('cell')[0].textContent ?? '').startsWith(name));
+      if (!found) throw new Error(`no row for ${name}`);
+      return found;
+    };
+    const [bosun, stew, deckhand, engineer, cook] = ['Bosun', 'Chief Stew', 'Deckhand', 'Engineer', 'Joining Cook'].map(row);
     const chip = within(bosun).getByText('Serious rest breach').closest('[data-reason]');
     expect(chip?.getAttribute('data-tone')).toBe('danger');
     expect(within(bosun).getByText('1 serious breach')).toBeInTheDocument();
@@ -296,7 +305,9 @@ describe('the fleet grid', () => {
     expect(within(stew).getByText('Assessed unfit').closest('[data-reason]')).not.toBeNull();
     expect(within(deckhand).getByText('Booster due').closest('[data-reason]')?.getAttribute('data-tone')).toBe('warn');
     expect(within(deckhand).getByText('Not shared')).toBeInTheDocument();
-    expect(within(engineer).getByText('Not known')).toBeInTheDocument();
+    expect(within(engineer).queryByText('Not known')).toBeNull();
+    expect(within(engineer).getByText('None on file').closest('[data-tone]')?.getAttribute('data-tone')).toBe('danger');
+    expect(within(engineer).getByText('No ENG1').closest('[data-reason]')?.getAttribute('data-tone')).toBe('danger');
     expect(within(engineer).getAllByText('No health record').length).toBeGreaterThan(0);
     expect(within(cook).getByText('Joining 10 Dec 2026')).toBeInTheDocument();
     expect(within(cook).getByText('Not tracked')).toBeInTheDocument();

@@ -10,8 +10,17 @@ import { supabase } from '@/integrations/supabase/client';
  *   <company_id>/crew/<crew_user_id>/<kind>/<timestamp>.<ext>   (HR files, `uploadCrewDocument`)
  *   <company_id>/crew/<profile_id>/documents/<uuid>-<name>      (crew documents, `uploadCrewDocumentFile`)
  *
- * The second prefix is narrowed to X1's crew-document predicates; no
- * `CrewDocumentKind` is `documents`, so the two never meet.
+ * Every object under `<company_id>/crew/` goes through one action-aware gate,
+ * storage_crew_document_allowed(name, action) in
+ * supabase/migrations/20261124000100_platform_storage_crew_documents.sql
+ * (D-373): `documents`, `certificates` and `attachments` follow X1's
+ * crew-document predicates; contracts, payslips, disciplinary, evaluations,
+ * right-to-work, next-of-kin, onboarding and recruitment follow the HR rights
+ * (payslips also payroll, evaluations also the reviewer); any other kind, a
+ * malformed name or an unknown subject is refused. Segment 3 must be a
+ * lower-case uuid (a login id or a profile id) and the file name a safe name.
+ * No `CrewDocumentKind` is `documents`, so the two writers never share a
+ * folder.
  *
  * The database stores the object *path* (not a URL). Reads go through a
  * short-lived signed URL, since the bucket is not public.

@@ -16,7 +16,8 @@
 --   fleet_document_ack_state (pure), fleet_document_vessel_pairs,
 --   fleet_document_person_department, fleet_document_is_senior,
 --   fleet_document_in_signer_set, fleet_document_hod_on_vessel,
---   fleet_document_file_readable (the storage read-hook predicate, PR-07)
+--   fleet_document_file_readable(uuid, uuid, text) (the storage read-hook
+--   predicate, per version file; PR-07, D-382)
 -- Triggers: fleet_document_acknowledgements_guard,
 --   fleet_document_signer_rules_guard, fleet_document_reminders_guard,
 --   fleet_documents_after_publish (carry forward, notify)
@@ -105,14 +106,17 @@
 -- vessel. In-app only: nothing here sends or promises an email (D-249).
 -- The due-soon, overdue and digest types are X5-09's sweep.
 --
--- Files (D-X5-17, PR-07): fleet_document_file_readable(user, document) is
--- the predicate the storage read hook (storage_path_read_hooks(),
--- 20261123020300) asks for <company>/fleet/documents/fleet_document/<id>/…:
--- library editors (any state), library readers (non-drafts) and the people
--- a published document is visible to (fleet_document_visible). The hook
--- passes the document, not the file: those people could open any file
--- stored for the document if they knew its path, but RLS shows them only
--- the published version's path (fleet_document_versions).
+-- Files (D-X5-17, PR-07, D-382): fleet_document_file_readable(user,
+-- document, name) is the predicate the storage read hook
+-- (storage_path_read_hooks(), 20261123020300) asks for
+-- <company>/fleet/documents/fleet_document/<id>/…, and its answer is final
+-- for reads: library editors any file of the document, library readers the
+-- files of versions that are not drafts, and the people a published
+-- document is visible to (fleet_document_visible) only the published
+-- version's file. The predicate is asked about the file, not only the
+-- document, so a draft or superseded file stays closed to crew even when
+-- its path is known; the same path with a vessel folder in place of
+-- /fleet/ is refused by the hook's scope.
 --
 -- Nothing here is live (D-01): the client reads through the pending shim
 -- and shows "Acknowledgements are not set up yet" while it is missing.
@@ -785,13 +789,20 @@ $$;
 
 -- ---------------------------------------------------------------- storage read-hook predicate (PR-07; D-X5-17)
 
--- Whether _user_id may read the files stored for the fleet document
--- (storage_path_read_hooks(): documents / fleet_document, path segment 5):
--- library editors in every state, library readers when it is not a draft,
--- and the people a published document is visible to through a vessel it
--- targets. Inactive users, unknown documents: false. Service only: the
--- storage gate (a definer) calls it.
-CREATE OR REPLACE FUNCTION public.fleet_document_file_readable(p_user_id uuid, p_document_id uuid)
+-- Whether p_user_id may read one file (p_name, the whole object name)
+-- stored for the fleet document (storage_path_read_hooks(): documents /
+-- fleet_document, path segment 5, scope fleet; D-382): library editors
+-- (documents edit) any file of the document; library readers (documents
+-- view) only the file of a version that is not a draft (published or
+-- superseded, fleet_document_versions.storage_path); everyone else only the
+-- file of the document's published version, and only while the published
+-- document is visible to them (fleet_document_visible). Inactive users,
+-- unknown documents, a NULL name: false. The storage gate (a definer)
+-- calls it with the path; the hook's answer is final, so a draft or a
+-- superseded file stays closed to crew whatever its path. Service only.
+-- The first (user, document) form answered per document and is dropped.
+DROP FUNCTION IF EXISTS public.fleet_document_file_readable(uuid, uuid);
+CREATE OR REPLACE FUNCTION public.fleet_document_file_readable(p_user_id uuid, p_document_id uuid, p_name text)
 RETURNS boolean
 LANGUAGE plpgsql
 STABLE
@@ -801,7 +812,7 @@ AS $$
 DECLARE
   d record;
 BEGIN
-  IF p_user_id IS NULL OR p_document_id IS NULL OR NOT coalesce(public.user_is_active(p_user_id), false) THEN
+  IF p_user_id IS NULL OR p_document_id IS NULL OR p_name IS NULL OR NOT coalesce(public.user_is_active(p_user_id), false) THEN
     RETURN false;
   END IF;
   SELECT fd.company_id, fd.status INTO d FROM public.fleet_documents AS fd WHERE fd.id = p_document_id;
@@ -811,10 +822,17 @@ BEGIN
   IF coalesce(public.fleet_ops_can_for(p_user_id, d.company_id, NULL, 'documents', 'edit'), false) THEN
     RETURN true;
   END IF;
-  IF d.status <> 'draft' AND coalesce(public.fleet_ops_can_for(p_user_id, d.company_id, NULL, 'documents', 'view'), false) THEN
-    RETURN true;
+  IF coalesce(public.fleet_ops_can_for(p_user_id, d.company_id, NULL, 'documents', 'view'), false) THEN
+    RETURN EXISTS (
+      SELECT 1 FROM public.fleet_document_versions AS v
+      WHERE v.document_id = p_document_id AND v.company_id = d.company_id AND v.storage_path = p_name AND v.state <> 'draft'
+    );
   END IF;
-  RETURN coalesce(public.fleet_document_visible(p_user_id, p_document_id), false);
+  RETURN EXISTS (
+           SELECT 1 FROM public.fleet_document_versions AS v
+           WHERE v.document_id = p_document_id AND v.company_id = d.company_id AND v.storage_path = p_name AND v.state = 'published'
+         )
+     AND coalesce(public.fleet_document_visible(p_user_id, p_document_id), false);
 END;
 $$;
 
@@ -1587,7 +1605,7 @@ REVOKE ALL ON FUNCTION public.fleet_document_is_senior(uuid, uuid, uuid, text, t
 REVOKE ALL ON FUNCTION public.fleet_document_in_signer_set(uuid, uuid, uuid, uuid, text, text) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fleet_document_ack_rows(uuid, uuid, uuid[], timestamptz) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fleet_document_ack_reader_for(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.fleet_document_file_readable(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.fleet_document_file_readable(uuid, uuid, text) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fleet_document_vessel_documents(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fleet_document_ack_status(uuid, uuid[]) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fleet_document_summary(uuid[]) FROM PUBLIC, anon, authenticated, service_role;
@@ -1606,7 +1624,7 @@ GRANT EXECUTE ON FUNCTION public.fleet_document_hod_on_vessel(uuid, uuid) TO ser
 GRANT EXECUTE ON FUNCTION public.fleet_document_is_senior(uuid, uuid, uuid, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.fleet_document_in_signer_set(uuid, uuid, uuid, uuid, text, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.fleet_document_ack_rows(uuid, uuid, uuid[], timestamptz) TO service_role;
-GRANT EXECUTE ON FUNCTION public.fleet_document_file_readable(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.fleet_document_file_readable(uuid, uuid, text) TO service_role;
 -- The policies run the reader check as the reader (and service-role jobs ask it about anyone).
 GRANT EXECUTE ON FUNCTION public.fleet_document_ack_reader_for(uuid, uuid, uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.fleet_document_vessel_documents(uuid) TO authenticated;
@@ -1633,7 +1651,7 @@ COMMENT ON FUNCTION public.fleet_document_hod_on_vessel(uuid, uuid) IS 'Internal
 COMMENT ON FUNCTION public.fleet_document_is_senior(uuid, uuid, uuid, text, text) IS 'Internal: the crew member is HoD or above for the hod_and_above signer rule (Master or senior office, legacy role, user_roles row, or the crew position catalogue''s command / hod tier when present).';
 COMMENT ON FUNCTION public.fleet_document_in_signer_set(uuid, uuid, uuid, uuid, text, text) IS 'Internal: the crew member is in the vessel''s signer set for the document type (type rule, else all-types rule, else everyone).';
 COMMENT ON FUNCTION public.fleet_document_ack_reader_for(uuid, uuid, uuid) IS 'RLS helper: the user may read the vessel''s (and the person''s) acknowledgement data: documents viewer with fleet reach; the person; the vessel''s Master; the HoD covering the person''s department. Active-aware; a signed-in caller asks about themselves only.';
-COMMENT ON FUNCTION public.fleet_document_file_readable(uuid, uuid) IS 'Storage read-hook predicate (PR-07, D-X5-17): the user may read the fleet document''s files (library editors any state, readers non-drafts, people the published document is visible to). Service only: storage_path_allowed calls it.';
+COMMENT ON FUNCTION public.fleet_document_file_readable(uuid, uuid, text) IS 'Storage read-hook predicate (PR-07, D-X5-17, D-382), per file: the user may read this object of the fleet document (library editors any file, library readers the files of versions that are not drafts, people the published document is visible to only the published version''s file). The hook''s answer is final for reads. Service only: storage_path_allowed calls it.';
 COMMENT ON FUNCTION public.fleet_document_vessel_documents(uuid) IS 'The fleet documents published to a vessel with their published version and the caller''s own acknowledgement state there; the caller reaches the vessel (42501 vessel_out_of_reach).';
 COMMENT ON FUNCTION public.fleet_document_ack_status(uuid, uuid[]) IS 'Acknowledgement rows of a document (or all) on the vessels given (or all), filtered to the caller''s readership; P0002 document_not_found, 42501 vessel_out_of_reach.';
 COMMENT ON FUNCTION public.fleet_document_summary(uuid[]) IS 'Acknowledgement counts per document x vessel (acknowledged, pending, overdue, blocked, can sign = pending + overdue) over the caller''s readership.';

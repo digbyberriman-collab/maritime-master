@@ -47,12 +47,16 @@
 --                  required flag and whether an exemption is recorded (never
 --                  its text). Required = on the company's list or marked
 --                  required on any of the person's records of that vaccine.
---   Rest           work_rest_compliance_checks over the last 30 days
---                  (p_today - 29 .. p_today, window_start in UTC), each
---                  check on the vessel of its month, else of the assignment
---                  covering its day (X5-02A's attribution,
---                  fleet_dashboard_hor_crew_days), counted on the vessel the
---                  person is listed on; only for people with a login on a
+--   Rest           breach days over the last 30 days (p_today - 29 ..
+--                  p_today) from fleet_dashboard_hor_crew_days (D-380): X1's
+--                  live, not dismissed non-conformities when its breach
+--                  review columns exist (the R9 report's breach days: day
+--                  breach_day, else the UTC day before window_end; vessel
+--                  the NC's, else its month's, else the assignment covering
+--                  the day), else failing work_rest_compliance_checks
+--                  (window_start in UTC, the vessel of its month, else of
+--                  the assignment covering its day), counted on the vessel
+--                  the person is listed on; only for people with a login on a
 --                  vessel whose crew and crew_hor modules are on (else not
 --                  tracked: NULL). Serious: X1's
 --                  work_rest_non_conformities.is_serious when that column
@@ -80,7 +84,7 @@
 -- Status (W8; fleet_medical_reasons / fleet_medical_status_of, mirrored by
 -- src/modules/fleet/lib/medicalStatus.ts), with the reasons as codes, most
 -- severe first and in this order:
---   critical    eng1_missing (with a Health record), eng1_unfit (the latest
+--   critical    eng1_missing (with or without a Health record, D-385), eng1_unfit (the latest
 --               assessment says unfit or temporarily unfit), eng1_expired,
 --               required_vaccine_expired, required_vaccine_missing,
 --               serious_rest_breach
@@ -241,7 +245,7 @@ PARALLEL SAFE
 SET search_path = public
 AS $$
   SELECT array_remove(ARRAY[
-    CASE WHEN p_eng1_state = 'missing' AND coalesce(p_has_health_record, false) THEN 'eng1_missing' END,
+    CASE WHEN p_eng1_state = 'missing' THEN 'eng1_missing' END,
     CASE WHEN p_eng1_state = 'unfit' THEN 'eng1_unfit' END,
     CASE WHEN p_eng1_state = 'expired' THEN 'eng1_expired' END,
     CASE WHEN coalesce(p_required_expired, 0) > 0 THEN 'required_vaccine_expired' END,

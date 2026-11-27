@@ -353,7 +353,7 @@ export const MEDICAL_EXPORT_COLUMNS: ReadonlyArray<ExportColumn<CrewMedicalRow>>
   { key: 'joining_on', header: 'Joining on', value: (r) => (r.isPlanned ? r.joinDate : null), kind: 'date' },
   { key: 'status', header: 'Status', value: (r) => statusMeta('medical_status', r.status).label },
   { key: 'reasons', header: 'Reasons', value: (r) => r.reasons.map((x) => MEDICAL_REASON_LABELS[x]).join('; '), width: 48 },
-  { key: 'eng1', header: 'ENG1', value: (r) => (r.eng1State === 'missing' && !r.hasHealthRecord ? 'Not known' : ENG1_STATE_LABELS[r.eng1State]) },
+  { key: 'eng1', header: 'ENG1', value: (r) => ENG1_STATE_LABELS[r.eng1State] },
   { key: 'eng1_expires_on', header: 'ENG1 expires', value: (r) => r.eng1ExpiresOn, kind: 'date' },
   { key: 'eng1_equivalent', header: 'ENG1 equivalent', value: (r) => r.eng1IsEquivalent, kind: 'boolean' },
   { key: 'vaccines_valid', header: 'Vaccines valid', value: (r) => r.vaccinesValid, kind: 'number' },

@@ -398,6 +398,14 @@ export type CrewLanguageRow = {
   updated_at: string;
 };
 
+/** crew_rehire_save's answer (061100, D-374). */
+export type CrewRehireSaveResult = {
+  assignment_id: string;
+  terms_id: string;
+  contract_id: string | null;
+  period_id: string | null;
+};
+
 export type CrewAssignmentTermsRow = {
   id: string;
   company_id: string;
@@ -1115,4 +1123,10 @@ export type CrewPendingFunctions = {
   };
   crew_vessel_employment_history: { Args: { p_vessel_id: string; p_department_key?: string | null }; Returns: CrewEmploymentHistoryRpcRow[] };
   crew_rehire_prefill: { Args: { p_profile_id: string; p_vessel_id: string }; Returns: Json };
+  /** The Add crew re-hire (D-374): the new assignment, terms, draft contract and On board period (contract and period null when not opened, D-375). */
+  crew_rehire_save: {
+    Args: { p_profile_id: string; p_vessel_id: string; p_terms: Json; p_personal?: Json };
+    /** jsonb: read as CrewRehireSaveResult. */
+    Returns: Json;
+  };
 };

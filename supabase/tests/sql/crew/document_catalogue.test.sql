@@ -14,6 +14,11 @@
 --      verification / alerts / new columns refused outside the engine, hard
 --      delete of a reviewed document refused, the subject locked, dates,
 --      company scope, a legacy row with reversed dates still changes;
+--      4b. direct writes follow crew_document_may_write (D-371): uploads off,
+--      the person's INSERT / UPDATE is refused and the medical requirement
+--      stays missing; uploads on, they write their own; DELETE of an old or
+--      HR-added row refused, own upload within 24 hours allowed; an HR
+--      editor's legacy writes still work;
 --   5. RLS: who reads whose documents (own, crew_profiles + crew_certificates
 --      viewers of the vessel, profile-only viewers, another vessel's crew,
 --      the legacy master, HR, externals, inactive, another tenant, anon); the
@@ -329,6 +334,72 @@ DELETE FROM public.crew_certificates WHERE id = tests.id('cert:reversed');
 
 -- B's crew document (for the matrix).
 INSERT INTO public.crew_certificates (id, user_id, certificate_type, certificate_name, expiry_date) VALUES (tests.id('cert:b'), tests.user_id('B.crew'), 'Passport', 'Passport', current_date + 50);
+
+-- ------------------------------------------------------------ 4b. direct writes follow crew_document_may_write (D-371)
+-- The legacy write policies (the person or an HR editor) stay; the guard
+-- holds every signed-in direct write to the rights crew_document_save and
+-- crew_document_delete use, so the crew-uploads setting is not bypassed and
+-- an unverified self-entered ENG1 cannot turn a requirement to met.
+SAVEPOINT x171_direct;
+SELECT tests.seed_user('A', 'A.x171_cook', 'crew');
+SELECT tests.seed_assignment('A.x171_cook', 'A.dra', true, 'Chef');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$SELECT public.crew_requirement_row_save(%L, NULL, jsonb_build_object('group_key', 'medical', 'label', 'Medical fitness',
+    'options', jsonb_build_array(jsonb_build_object('document_type_id', %L::uuid)),
+    'position_ids', (SELECT jsonb_agg(position_id) FROM public.crew_positions_for_vessel(%L))))$q$,
+  tests.vessel_id('A.dra'), pg_temp.ty('eng1'), tests.vessel_id('A.dra')), 'direct writes: ENG1 required on DRAAK for every position');
+SELECT tests.reset_role();
+CREATE OR REPLACE FUNCTION pg_temp.medical_state(p_key text) RETURNS text LANGUAGE sql AS $$
+  SELECT state FROM public.crew_vessel_requirement_status(tests.vessel_id('A.dra'), tests.profile_id(p_key)) WHERE group_key = 'medical'
+$$;
+-- A document HR added for the cook two days ago (old) and one of another person.
+INSERT INTO public.crew_certificates (id, user_id, certificate_type, certificate_name, expiry_date, created_by, created_at)
+VALUES (tests.id('cert:x171_old'), tests.user_id('A.x171_cook'), 'Misc', 'Old letter', current_date + 400, tests.user_id('A.x171_cook'), now() - interval '2 days'),
+       (tests.id('cert:x171_hr'), tests.user_id('A.x171_cook'), 'Misc', 'HR letter', current_date + 400, tests.user_id('A.hr'), now()),
+       (tests.id('cert:x171_peer'), tests.user_id('A.viewer'), 'Misc', 'Peer letter', current_date + 400, tests.user_id('A.viewer'), now());
+SELECT tests.as_user(tests.user_id('A.x171_cook'));
+SELECT tests.is(pg_temp.medical_state('A.x171_cook'), 'missing', 'direct writes: the cook''s medical requirement is missing');
+SELECT tests.ok(NOT (SELECT can_add FROM public.crew_document_rights(tests.profile_id('A.x171_cook'))), 'direct writes: crew uploads off, the cook may add nothing');
+SELECT tests.throws_like(format($q$INSERT INTO public.crew_certificates (user_id, certificate_name, certificate_type, certificate_number, issue_date, expiry_date)
+                                   VALUES (%L, 'ENG1 Medical Certificate', 'ENG1 Medical Certificate', 'SELF-1', current_date - 1, current_date + 700)$q$, tests.user_id('A.x171_cook')),
+  '42501', 'crew_not_permitted', 'uploads off: a self INSERT of an ENG1 through the legacy policy is refused');
+SELECT tests.is(pg_temp.medical_state('A.x171_cook'), 'missing', 'uploads off: and the medical requirement stays missing');
+SELECT tests.throws_like(format($q$UPDATE public.crew_certificates SET certificate_number = 'SELF-2' WHERE id = %L$q$, tests.id('cert:x171_hr')),
+  '42501', 'crew_not_permitted', 'uploads off: a self UPDATE is refused');
+SELECT tests.throws_like(format($q$DELETE FROM public.crew_certificates WHERE id = %L$q$, tests.id('cert:x171_hr')),
+  '42501', 'crew_not_permitted', 'the subject cannot delete a document HR added');
+SELECT tests.throws_like(format($q$DELETE FROM public.crew_certificates WHERE id = %L$q$, tests.id('cert:x171_old')),
+  '42501', 'crew_not_permitted', 'nor their own upload after 24 hours');
+SELECT tests.lives(format($q$DELETE FROM public.crew_certificates WHERE id = %L$q$, tests.id('cert:x171_peer')), 'a delete of another person''s row reaches no row');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_certificates WHERE id IN (tests.id('cert:x171_old'), tests.id('cert:x171_hr'), tests.id('cert:x171_peer')))::integer, 3,
+  'direct writes: the three rows are all still there');
+SELECT tests.is((SELECT certificate_number FROM public.crew_certificates WHERE id = tests.id('cert:x171_hr')), NULL, 'direct writes: the refused update changed nothing');
+-- Crew uploads on: the person adds and changes their own, removes their own upload within 24 hours, never an old one.
+INSERT INTO public.vessel_crew_settings (vessel_id, crew_uploads_enabled) VALUES (tests.vessel_id('A.dra'), true);
+SELECT tests.as_user(tests.user_id('A.x171_cook'));
+SELECT tests.lives(format($q$INSERT INTO public.crew_certificates (id, user_id, certificate_name, certificate_type, certificate_number, expiry_date, created_by)
+                             VALUES (%L, %L, 'Food Hygiene Certificate', 'Food Hygiene Certificate', 'FH-1', current_date + 700, %L)$q$,
+                          tests.id('cert:x171_own'), tests.user_id('A.x171_cook'), tests.user_id('A.x171_cook')),
+  'uploads on: a self INSERT is allowed');
+SELECT tests.lives(format($q$UPDATE public.crew_certificates SET certificate_number = 'FH-2' WHERE id = %L$q$, tests.id('cert:x171_own')), 'uploads on: a self UPDATE is allowed');
+SELECT tests.throws_like(format($q$DELETE FROM public.crew_certificates WHERE id = %L$q$, tests.id('cert:x171_old')),
+  '42501', 'crew_not_permitted', 'uploads on: an old upload is still the editors''');
+SELECT tests.lives(format($q$DELETE FROM public.crew_certificates WHERE id = %L$q$, tests.id('cert:x171_own')), 'uploads on: their own upload within 24 hours is deleted');
+SELECT tests.reset_role();
+SELECT tests.ok(NOT EXISTS (SELECT 1 FROM public.crew_certificates WHERE id = tests.id('cert:x171_own'))
+                AND EXISTS (SELECT 1 FROM public.crew_certificates WHERE id = tests.id('cert:x171_old')), 'direct writes: the own upload is gone, the old one stays');
+-- An HR editor's legacy writes still work, uploads off or on.
+UPDATE public.vessel_crew_settings SET crew_uploads_enabled = false WHERE vessel_id = tests.vessel_id('A.dra');
+SELECT tests.as_user(tests.user_id('A.hr'));
+SELECT tests.lives(format($q$INSERT INTO public.crew_certificates (id, user_id, certificate_name, certificate_type, expiry_date) VALUES (%L, %L, 'Misc', 'Misc', current_date + 300)$q$,
+                          tests.id('cert:x171_hr2'), tests.user_id('A.x171_cook')), 'an HR editor''s legacy INSERT still works');
+SELECT tests.lives(format($q$UPDATE public.crew_certificates SET certificate_number = 'HR-9' WHERE id = %L$q$, tests.id('cert:x171_hr2')), 'and its UPDATE');
+SELECT tests.lives(format($q$DELETE FROM public.crew_certificates WHERE id = %L$q$, tests.id('cert:x171_old')), 'and its DELETE of an unreviewed row');
+SELECT tests.reset_role();
+SELECT tests.results_eq(format($q$SELECT certificate_number FROM public.crew_certificates WHERE id IN (%L, %L)$q$, tests.id('cert:x171_hr2'), tests.id('cert:x171_old')),
+  $q$VALUES ('HR-9'::text)$q$, 'direct writes: the HR editor''s writes landed');
+ROLLBACK TO SAVEPOINT x171_direct;
 
 -- ------------------------------------------------------------ 5. RLS
 
@@ -812,9 +883,9 @@ BEGIN
     PERFORM tests.is(public.crew_document_file_writable(tests.user_id(c.persona), tests.profile_id(c.subject)), c.can_write,
                      format('crew_document_file_writable(%s, %s) is %s', c.persona, c.subject, c.can_write));
     PERFORM tests.as_user(tests.user_id(c.persona));
-    PERFORM tests.is(public.storage_crew_document_allowed(pg_temp.doc_path(c.subject), false), c.can_read,
+    PERFORM tests.is(public.storage_crew_document_allowed(pg_temp.doc_path(c.subject), 'read'), c.can_read,
                      format('the documents bucket gate lets %s read %s''s files: %s', c.persona, c.subject, c.can_read));
-    PERFORM tests.is(public.storage_crew_document_allowed(pg_temp.doc_path(c.subject), true), c.can_write,
+    PERFORM tests.is(public.storage_crew_document_allowed(pg_temp.doc_path(c.subject), 'insert'), c.can_write,
                      format('and write: %s', c.can_write));
     PERFORM tests.reset_role();
   END LOOP;

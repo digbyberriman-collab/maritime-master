@@ -37,9 +37,21 @@ SELECT r.id, 'crew_certificates', x.p::public.permission_level, 'vessel'
 FROM (VALUES ('x16_admin', 'admin'), ('x16_view', 'view')) AS x(r, p)
 JOIN public.roles AS r ON r.name = x.r;
 
-SELECT tests.seed_user('A', 'A.cadmin', 'crew');                                 -- compliance admin on A.dra
+SELECT tests.seed_user('A', 'A.cadmin', 'crew');                                 -- compliance admin on A.dra and company-wide
 SELECT tests.seed_assignment('A.cadmin', 'A.dra', true, 'Second Officer');
 SELECT tests.seed_rbac_role('A.cadmin', 'x16_admin', 'A.dra');
+-- The company-wide grant (a role bound to no vessel, D-376) for the company-level cases.
+SELECT tests.seed_role('x16_admin_company', 'fleet');
+INSERT INTO public.role_permissions (role_id, module_key, permission, scope)
+SELECT r.id, 'crew_certificates', 'admin', 'fleet' FROM public.roles AS r WHERE r.name = 'x16_admin_company';
+SELECT tests.seed_rbac_role('A.cadmin', 'x16_admin_company');
+SELECT tests.seed_user('A', 'A.vbadmin', 'crew');                                -- compliance admin bound to A.dra only (vessel scope); shore, reaches A.dra
+UPDATE public.account_memberships
+SET legacy_managed = false, kind = 'shore', vessel_scope = 'assigned', fleet_access = false, source = 'admin'
+WHERE user_id = tests.user_id('A.vbadmin');
+INSERT INTO public.account_membership_vessels (membership_id, company_id, vessel_id)
+SELECT id, company_id, tests.vessel_id('A.dra') FROM public.account_memberships WHERE user_id = tests.user_id('A.vbadmin');
+SELECT tests.seed_rbac_role('A.vbadmin', 'x16_admin', 'A.dra');
 SELECT tests.seed_user('A', 'A.cview', 'crew');                                  -- compliance view on A.hyd only
 SELECT tests.seed_assignment('A.cview', 'A.hyd', true, 'Bosun');
 SELECT tests.seed_rbac_role('A.cview', 'x16_view', 'A.hyd');
@@ -97,6 +109,11 @@ SELECT tests.ok(public.has_capability_for(tests.user_id('A.cadmin'), 'vessel.cre
                 AND NOT public.has_capability_for(tests.user_id('A.cadmin'), 'vessel.crew.crew_compliance.view', tests.company_id('A'), tests.vessel_id('A.hyd'))
                 AND public.has_capability_for(tests.user_id('A.cadmin'), 'vessel.crew.crew_compliance.admin', tests.company_id('A'), NULL),
   'setup: A.cadmin administers crew compliance on DRAAK (and at company level), not on HYDRA');
+SELECT tests.ok(public.has_company_capability_for(tests.user_id('A.cadmin'), 'vessel.crew.crew_compliance.admin', tests.company_id('A'))
+                AND NOT public.has_company_capability_for(tests.user_id('A.vbadmin'), 'vessel.crew.crew_compliance.admin', tests.company_id('A'))
+                AND public.has_capability_for(tests.user_id('A.vbadmin'), 'vessel.crew.crew_compliance.admin', tests.company_id('A'), tests.vessel_id('A.dra'))
+                AND public.has_capability_for(tests.user_id('A.vbadmin'), 'vessel.crew.crew_compliance.admin', tests.company_id('A'), NULL),
+  'setup: A.vbadmin (a role bound to DRAAK, vessel scope) administers DRAAK and answers "anywhere in the company", but not company-wide (D-376)');
 SELECT tests.ok(public.has_capability_for(tests.user_id('A.cview'), 'vessel.crew.crew_compliance.view', tests.company_id('A'), tests.vessel_id('A.hyd'))
                 AND NOT public.has_capability_for(tests.user_id('A.cview'), 'vessel.crew.crew_compliance.admin', tests.company_id('A'), tests.vessel_id('A.hyd'))
                 AND NOT public.has_capability_for(tests.user_id('A.cview'), 'vessel.crew.crew_compliance.view', tests.company_id('A'), tests.vessel_id('A.dra')),
@@ -341,6 +358,8 @@ SELECT tests.as_user(tests.user_id('A.cadmin'));
 INSERT INTO rpc_out VALUES ('config_admin', public.crew_requirements_config(tests.vessel_id('A.dra')));
 SELECT tests.as_user(tests.user_id('A.master_dra'));
 INSERT INTO rpc_out VALUES ('config_master', public.crew_requirements_config(tests.vessel_id('A.dra')));
+SELECT tests.as_user(tests.user_id('A.vbadmin'));
+INSERT INTO rpc_out VALUES ('config_vbadmin', public.crew_requirements_config(tests.vessel_id('A.dra')));
 SELECT tests.as_user(tests.user_id('A.deck'));
 SELECT tests.throws($q$SELECT public.crew_requirements_config(tests.vessel_id('A.dra'))$q$, '42501', 'a deckhand cannot read the configuration');
 SELECT tests.as_user(tests.user_id('A.ext'));
@@ -349,6 +368,8 @@ SELECT tests.reset_role();
 SELECT tests.ok((SELECT (r ->> 'can_admin')::boolean AND (r ->> 'can_admin_company')::boolean FROM rpc_out WHERE k = 'config_admin')
                 AND (SELECT NOT (r ->> 'can_admin')::boolean AND NOT (r ->> 'can_admin_company')::boolean FROM rpc_out WHERE k = 'config_master'),
   'config: the admin may change it (vessel and company level), the master only reads');
+SELECT tests.ok((SELECT (r ->> 'can_admin')::boolean AND NOT (r ->> 'can_admin_company')::boolean FROM rpc_out WHERE k = 'config_vbadmin'),
+  'config: a vessel-bound admin administers the vessel, not the company (can_admin_company false, D-376)');
 SELECT tests.is((SELECT jsonb_array_length(r -> 'rows') FROM rpc_out WHERE k = 'config_admin'), 6, 'config: six rows (the familiarisation row included)');
 SELECT tests.results_eq($q$SELECT x ->> 'name', (x ->> 'is_listed')::boolean FROM rpc_out, jsonb_array_elements(r -> 'positions') AS x WHERE k = 'config_admin'$q$,
   $q$VALUES ('Master', true), ('Second Officer', true), ('Deckhand', true)$q$, 'config: the listed positions in rank order');
@@ -541,6 +562,14 @@ SELECT tests.ok((SELECT s.crew_uploads_enabled AND s.transfer_requires_fleet_app
 SELECT tests.reset_role();
 
 -- Tenant document types (company level).
+-- A vessel-bound admin is no company-wide administrator (D-376).
+SELECT tests.as_user(tests.user_id('A.vbadmin'));
+SELECT tests.throws_like($q$SELECT public.crew_document_type_create('stcw_basic', 'Vessel-bound probe type')$q$, '42501', 'crew_not_permitted',
+  'a DRAAK-bound compliance admin cannot add a company document type');
+SELECT tests.throws_like($q$SELECT public.crew_document_type_satisfies_save(md5('storm.crew_document_type.stcw_aff')::uuid, md5('storm.crew_document_type.stcw_pst')::uuid, 'equivalent')$q$,
+  '42501', 'crew_not_permitted', 'nor change which documents count for every vessel');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_document_types WHERE name = 'Vessel-bound probe type'), 0::bigint, 'no type was added');
 SELECT tests.as_user(tests.user_id('A.cadmin'));
 INSERT INTO rpc_out SELECT 'type_a', to_jsonb(public.crew_document_type_create('stcw_basic', '  Acme sea survival  ', 'acme-ss', 'ASS', 60, 'Company course'));
 SELECT tests.throws_like($q$SELECT public.crew_document_type_create('stcw_basic', 'Personal survival techniques')$q$, '22023', 'document_type_exists', 'the name of a STORM type');

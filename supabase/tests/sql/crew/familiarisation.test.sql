@@ -254,6 +254,32 @@ SELECT tests.throws_like(format($q$INSERT INTO public.familiarization_templates 
 SELECT tests.as_user(tests.user_id('A.x110_chief_stew'));
 SELECT tests.throws_like(format($q$SELECT public.familiarisation_template_save(%L, NULL, '{"name":"x","scope":"fleet","sections":[{"section_name":"A","checklist_items":["a"]}]}')$q$, tests.vessel_id('A.dra')),
   '42501', 'crew_not_permitted', 'a vessel editor without fleet reach keeps no fleet template');
+-- D-376: a vessel-limited admin (admin membership over DRAAK only) with the
+-- seeded captain role bound to DRAAK is no fleet office: the fleet save is
+-- refused (company-wide answer, admin_scope_all instead of is_company_actor)
+-- and the overview says so.
+SELECT tests.reset_role();
+SELECT tests.seed_user('A', 'A.x110_vcap', 'crew');
+SELECT tests.seed_rbac_role('A.x110_vcap', 'captain', 'A.dra');
+UPDATE public.account_memberships
+SET legacy_managed = false, kind = 'admin', status = 'active', fleet_access = false, vessel_scope = 'assigned',
+    is_dpa = false, manages_admins = false, source = 'admin', users_access_level = 'read'
+WHERE user_id = tests.user_id('A.x110_vcap');
+INSERT INTO public.account_membership_vessels (membership_id, company_id, vessel_id)
+SELECT m.id, m.company_id, tests.vessel_id('A.dra') FROM public.account_memberships AS m WHERE m.user_id = tests.user_id('A.x110_vcap');
+SELECT tests.ok(public.has_capability_for(tests.user_id('A.x110_vcap'), 'vessel.crew.familiarisation.edit', tests.company_id('A'), tests.vessel_id('A.dra'))
+                AND public.has_capability_for(tests.user_id('A.x110_vcap'), 'vessel.crew.familiarisation.edit', tests.company_id('A'), NULL)
+                AND NOT public.has_company_capability_for(tests.user_id('A.x110_vcap'), 'vessel.crew.familiarisation.edit', tests.company_id('A'))
+                AND NOT public.admin_scope_all(tests.user_id('A.x110_vcap'), tests.company_id('A')),
+                'setup: the vessel-limited admin edits DRAAK''s familiarisation, but holds no company-wide answer and is no all-vessel admin');
+SELECT tests.as_user(tests.user_id('A.x110_vcap'));
+SELECT tests.throws_like(format($q$SELECT public.familiarisation_template_save(%L, NULL, '{"scope":"fleet","name":"Probe fleet template","sections":[{"section_name":"Bridge","checklist_items":["Probe item"]}]}')$q$, tests.vessel_id('A.dra')),
+  '42501', 'crew_not_permitted', 'a vessel-limited admin with a vessel-bound captain role keeps no fleet template');
+SELECT tests.is((public.familiarisation_vessel_overview(tests.vessel_id('A.dra')) ->> 'can_edit_fleet_templates')::boolean, false,
+  'and the overview says they cannot edit fleet templates');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.familiarization_templates WHERE template_name = 'Probe fleet template'), 0::bigint, 'no fleet template was written');
+SELECT tests.as_user(tests.user_id('A.x110_chief_stew'));
 SELECT tests.throws_like(format($q$SELECT public.familiarisation_template_save(%L, NULL, '{"name":"x","colour":"red"}')$q$, tests.vessel_id('A.dra')),
   '22023', 'field_unknown', 'an unknown field is refused');
 SELECT tests.throws_like(format($q$SELECT public.familiarisation_template_save(%L, NULL, '{"name":"  ","sections":[{"section_name":"A","checklist_items":["a"]}]}')$q$, tests.vessel_id('A.dra')),

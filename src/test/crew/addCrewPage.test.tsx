@@ -14,7 +14,8 @@
  * - duplicates: a name match asks to confirm; an email match blocks; a
  *   missing check is skipped and said;
  * - D-01: without the positions catalogue the position is typed;
- * - a re-hire saves only the terms;
+ * - a re-hire is one crew_rehire_save call (D-374): the outcome names what
+ *   the server opened; missing (PGRST202) and refusals are not re-hired;
  * - the layout cannot overflow at 390 px.
  *
  * The client is mocked at supabase.rpc / from / functions.invoke; the real
@@ -426,12 +427,23 @@ describe('D-01 and errors', () => {
 });
 
 describe('re-hire (?rehire=)', () => {
-  it('prefills the person and the last terms, locks the names, and saves only the terms', async () => {
+  const prefill = () => {
     h.tables.profiles = { data: [{ id: P_OLD, first_name: 'Demo', last_name: 'Chief Stew', preferred_name: null, email: 'chief.stew@example.test', company_id: 'c-1' }], error: null };
     h.tables.crew_assignment_terms = {
       data: [{ position_id: 'p-deckhand', department_key: 'deck', contract_type_key: 'rotational', leave_method: 'ratio', leave_days_per_year: null, leave_ratio_on: 2, leave_ratio_off: 1, place_of_embarkation: 'Palma', start_date: '2025-04-01' }],
       error: null,
     };
+  };
+  const rehireSave = async () => {
+    renderAt(`/v/dra/crew/new?rehire=${P_OLD}`);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Re-hire crew member' })).toBeInTheDocument();
+    type(/^Start date/, '2026-12-01');
+    fireEvent.click(screen.getByRole('button', { name: 'Save employment' }));
+  };
+
+  it('prefills the person and the last terms, locks the names, and re-hires through crew_rehire_save (D-374)', async () => {
+    prefill();
+    rpcAnswers.crew_rehire_save = () => ({ data: { assignment_id: 'a-new', terms_id: 't-new', contract_id: 'c-draft', period_id: 'fp-1' }, error: null });
     renderAt(`/v/dra/crew/new?rehire=${P_OLD}`);
     expect(await screen.findByRole('heading', { level: 1, name: 'Re-hire crew member' })).toBeInTheDocument();
     expect(screen.getByLabelText(/^First name/)).toHaveValue('Demo');
@@ -440,13 +452,54 @@ describe('re-hire (?rehire=)', () => {
     expect(screen.queryByRole('switch', { name: 'Send an invitation now' })).toBeNull();
     type(/^Start date/, '2026-12-01');
     fireEvent.click(screen.getByRole('button', { name: 'Save employment' }));
-    expect(await screen.findByRole('heading', { name: 'Employment saved' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Re-hired' })).toBeInTheDocument();
+    expect(screen.getByText("They are on this vessel's crew again from the start date, with their new employment details.")).toBeInTheDocument();
+    expect(screen.getByText('A draft contract is open for them. Complete it from Employment on the profile.')).toBeInTheDocument();
+    expect(screen.getByText('The planner shows them On board from the day they join.')).toBeInTheDocument();
     expect(h.invoke).not.toHaveBeenCalled();
     expect(rpcCalls('crew_find_duplicates')).toHaveLength(0);
-    expect(rpcCalls('crew_onboarding_save')[0][1]).toMatchObject({
+    expect(rpcCalls('crew_onboarding_save')).toHaveLength(0);
+    expect(rpcCalls('crew_rehire_save')[0][1]).toMatchObject({
       p_profile_id: P_OLD,
+      p_vessel_id: 'v-dra',
       p_terms: { start_date: '2026-12-01', position_id: 'p-deckhand', department_key: 'deck', contract_type_key: 'rotational', leave_method: 'ratio', leave_ratio_on: 2, leave_ratio_off: 1, place_of_embarkation: 'Palma' },
     });
+  });
+
+  it('names only what the server opened: no contract and no period returned, no such lines', async () => {
+    prefill();
+    rpcAnswers.crew_rehire_save = () => ({ data: { assignment_id: 'a-new', terms_id: 't-new', contract_id: null, period_id: null }, error: null });
+    await rehireSave();
+    expect(await screen.findByRole('heading', { name: 'Re-hired' })).toBeInTheDocument();
+    expect(screen.queryByText(/draft contract/)).toBeNull();
+    expect(screen.queryByText(/On board from/)).toBeNull();
+  });
+
+  it('crew_rehire_save not applied (PGRST202): not re-hired, the D-01 sentence, never a fake success', async () => {
+    prefill();
+    await rehireSave();
+    expect(await screen.findByText('Re-hire is not available yet: the crew update is not applied.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Re-hired' })).toBeNull();
+    expect(h.notify.error).toHaveBeenCalledWith('Re-hire is not available yet: the crew update is not applied.', { title: 'The crew member was not re-hired' });
+    expect(rpcCalls('crew_rehire_save')).toHaveLength(1);
+    expect(rpcCalls('crew_onboarding_save')).toHaveLength(0);
+  });
+
+  it.each([
+    ['22023', 'on_crew_now', 'This person is on a crew today. Transfer them instead.'],
+    ['22023', 'transfer_open', 'This person has a transfer in progress. Open it from their profile.'],
+    ['P0002', 'person_not_found', 'This crew member could not be found.'],
+    ['0A000', 'rehire_no_login', 'Re-hiring someone without a sign-in is not available yet. Invite them first, or add them again as a new crew member.'],
+    ['42501', 'out_of_reach', 'You can only do this for people on the vessels you administer.'],
+  ])('a %s %s refusal shows its sentence and saves nothing else', async (code, message, details) => {
+    prefill();
+    rpcAnswers.crew_rehire_save = () => ({ data: null, error: { code, message, details } });
+    await rehireSave();
+    expect(await screen.findByText(details)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Re-hired' })).toBeNull();
+    expect(h.notify.error).toHaveBeenCalledWith(details, { title: 'The crew member was not re-hired' });
+    expect(h.invoke).not.toHaveBeenCalled();
+    expect(rpcCalls('crew_onboarding_save')).toHaveLength(0);
   });
 });
 

@@ -25,6 +25,13 @@
 --      stamp, refused under a JWT);
 --  11. end of employment: effects and gates;
 --  12. the vessel's employment history and the re-hire prefill: gates;
+--  12b. the re-hire save (D-374, D-375): after an ended employment one
+--      current assignment, terms linked to it, one draft contract and one
+--      On board period; refusals (on another crew now, another company,
+--      D-207 out of reach, a Master position without users-access admin,
+--      an open transfer, no login, a taken start date, the terms rules,
+--      no create/assign, external, inactive, another tenant, anon), each
+--      atomic;
 --  13. emitters (the three types live in crew/module.ts) and grants.
 
 \set parity `node --input-type=module -e "const lt0=await import('./scripts/db/lib/load-ts.mjs'); const f='src/modules/crew/lib/transfer.ts'; const r=await lt0.loadTs([f]); const T=r.modules[f]; const out=[]; for (const s of [...T.TRANSFER_STATUSES, null, 'bogus']) for (const a of [...T.TRANSFER_ACTIONS, 'bogus']) for (const ra of [true,false,null]) for (const ack of [true,false,null]) for (const due of [true,false,null]) out.push([s,a,ra,ack,due,T.nextTransferStatus(s,a,ra,ack,due)]); process.stdout.write(JSON.stringify(out));"`
@@ -74,6 +81,12 @@ SET legacy_managed = false, kind = 'external', vessel_scope = 'assigned', fleet_
 WHERE user_id = tests.user_id('A.x111_ext');
 -- The fleet approver (shore management: fleet reach, every crew key).
 SELECT tests.seed_user('A', 'A.x111_shore', 'shore_management');
+-- Fleet reach, but the assign / approve role bound to DRAAK only (vessel scope): no fleet approver (D-376).
+SELECT tests.seed_user('A', 'A.x111_vapprover', 'crew');
+UPDATE public.account_memberships
+SET legacy_managed = false, kind = 'shore', vessel_scope = 'all', fleet_access = true, source = 'admin'
+WHERE user_id = tests.user_id('A.x111_vapprover');
+SELECT tests.seed_rbac_role('A.x111_vapprover', 'x111_assign', 'A.dra');
 -- The subjects.
 SELECT pg_temp.crew('A.x111_deck', 'A.dra', 'Deckhand');
 SELECT pg_temp.crew('A.x111_ab', 'A.dra', 'AB Seaman');
@@ -446,6 +459,18 @@ SELECT tests.throws_like(format($q$SELECT public.transfer_crew_decide(%L, 'appro
 SELECT tests.throws_like(format($q$SELECT public.transfer_crew(%L)$q$, pg_temp.tid('stew')), '22023', 'illegal_transition', 'a pending transfer cannot be completed');
 SELECT tests.as_user(tests.user_id('A.x111_officer'));
 SELECT tests.throws(format($q$SELECT public.transfer_crew_decide(%L, 'approve')$q$, pg_temp.tid('stew')), '42501', 'an officer is no fleet approver');
+SELECT tests.reset_role();
+SELECT tests.ok(public.fleet_reach_for(tests.user_id('A.x111_vapprover'), tests.company_id('A'))
+                AND public.has_capability_for(tests.user_id('A.x111_vapprover'), 'vessel.crew.crew_assignments.approve', tests.company_id('A'), NULL)
+                AND NOT public.has_company_capability_for(tests.user_id('A.x111_vapprover'), 'vessel.crew.crew_assignments.approve', tests.company_id('A')),
+  'setup: fleet reach and a DRAAK-bound approve role: "anywhere in the company" yes, company-wide no (D-376)');
+SELECT tests._set_claims(jsonb_build_object('sub', tests.user_id('A.x111_vapprover'), 'role', 'authenticated'));
+SELECT tests.is(public.crew_transfer_is_approver(tests.company_id('A')), false, 'a vessel-bound approve role is no fleet approver of transfers');
+SELECT tests._set_claims(jsonb_build_object('sub', tests.user_id('A.x111_shore'), 'role', 'authenticated'));
+SELECT tests.is(public.crew_transfer_is_approver(tests.company_id('A')), true, 'control: shore management is');
+SELECT tests.reset_role();
+SELECT tests.as_user(tests.user_id('A.x111_vapprover'));
+SELECT tests.throws(format($q$SELECT public.transfer_crew_decide(%L, 'approve')$q$, pg_temp.tid('stew')), '42501', 'so they cannot approve a transfer that needs fleet approval');
 SELECT tests.as_user(tests.user_id('A.x111_shore'));
 SELECT tests.throws_like(format($q$SELECT public.transfer_crew_decide(%L, 'decline')$q$, pg_temp.tid('stew')), '22023', 'reason_required', 'a decline needs a reason');
 SELECT tests.throws_like(format($q$SELECT public.transfer_crew_decide(%L, 'maybe')$q$, pg_temp.tid('stew')), '22023', 'decision_unknown', 'approve or decline');
@@ -589,6 +614,158 @@ SELECT tests.as_user(tests.user_id('A.disabled'));
 SELECT tests.throws(format($q$SELECT * FROM public.crew_vessel_employment_history(%L)$q$, tests.vessel_id('A.dra')), '42501', 'an inactive user reads no history');
 SELECT tests.reset_role();
 
+-- ------------------------------------------------------------ 12b. the re-hire save (D-374, D-375)
+-- crew_onboarding_save refuses a person on no crew (its gate is "on this
+-- vessel's crew"), so the re-hire is crew_rehire_save: the assignment, the
+-- terms linked to it, the draft contract and the On board period, all or nothing.
+SELECT pg_temp.crew('A.x374_back', 'A.dra', 'Deckhand');
+SELECT pg_temp.crew('A.x374_open', 'A.dra', 'Deckhand');
+SELECT pg_temp.crew('A.x374_master', 'A.dra', 'Deckhand');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT pg_temp.put('x374_end_' || k, public.crew_end_employment(tests.profile_id(k), tests.vessel_id('A.dra'), current_date - 1, 'contract_end'))
+FROM unnest(ARRAY['A.x374_back', 'A.x374_open', 'A.x374_master']) AS k;
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_assignments AS x
+                 WHERE x.user_id IN (tests.user_id('A.x374_back'), tests.user_id('A.x374_open'), tests.user_id('A.x374_master'))
+                   AND public.crew_assignment_is_current(x.is_current, x.leave_date, x.end_date))::integer, 0,
+  'setup: the three are on no crew after their employment ended');
+-- An open transfer of an ended person (written as the engine would).
+SELECT set_config('storm.crew_engine', 'on', true);
+INSERT INTO public.crew_transfers (id, company_id, profile_id, user_id, from_vessel_id, to_vessel_id, sign_off_date, sign_on_date, status, created_by, updated_by)
+VALUES (tests.id('x374:transfer'), tests.company_id('A'), tests.profile_id('A.x374_open'), tests.user_id('A.x374_open'), tests.vessel_id('A.dra'), tests.vessel_id('A.gam'),
+        current_date + 5, current_date + 6, 'draft', tests.user_id('A.fleet_manager'), tests.user_id('A.fleet_manager'));
+SELECT set_config('storm.crew_engine', '', true);
+-- The old employment's terms on DRAAK (a re-hire on the same start date is refused).
+INSERT INTO public.crew_assignment_terms (company_id, profile_id, vessel_id, position_id, department_key, start_date, end_date, end_reason)
+VALUES (tests.company_id('A'), tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand'), 'deck', current_date - 300, current_date - 1, 'contract_end');
+
+-- The verifier's repro: the save Add crew made for a re-hire was refused.
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.throws_like(format($q$SELECT public.crew_onboarding_save(%L, %L, jsonb_build_object('start_date', current_date + 5))$q$,
+                                tests.profile_id('A.x374_back'), tests.vessel_id('A.dra')),
+  '42501', 'crew_onboarding_refused', 'crew_onboarding_save still refuses a person on no crew (the re-hire has its own definer)');
+
+-- Refusals (each before anything is written).
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                                tests.profile_id('A.x111_deck'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '22023', 'on_crew_now', 'someone on another crew today: transfer them instead');
+SELECT tests.throws(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                           tests.profile_id('B.admin'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  'P0002', 'a person of another company is unknown');
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                                tests.profile_id('A.x374_open'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '22023', 'transfer_open', 'an open transfer of the person is refused');
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                                tests.profile_id('A.x111_ghost'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '0A000', 'rehire_no_login', 'a person without a login: not available until the pending-placement engine (PR-X1-M)');
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date - 300, 'position_id', %L))$q$,
+                                tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '22023', 'start_date_taken', 'a start date that already has terms on the vessel is refused');
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                                tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), tests.id('position:nowhere')),
+  '22023', 'position_unknown', 'an unknown position is refused');
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('position_id', %L))$q$,
+                                tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '22023', 'start_date_required', 'the start date is required');
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L, 'leave_method', 'monthly'))$q$,
+                                tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '22023', 'field_invalid', 'the shared terms rules apply (and roll the assignment back)');
+SELECT tests.reset_role();
+SELECT tests.ok(public.has_capability_for(tests.user_id('A.x111_officer'), 'vessel.crew.crew_profiles.create', tests.company_id('A'), tests.vessel_id('A.dra')),
+  'setup: the officer may add crew on DRAAK');
+SELECT tests.as_user(tests.user_id('A.x111_officer'));
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                                tests.profile_id('A.x111_double'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '42501', 'out_of_reach', 'D-207: a person outside the officer''s reach');
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                                tests.profile_id('A.x374_master'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '42501', 'out_of_reach', 'D-207: someone on no crew is outside a vessel officer''s reach');
+-- A company-wide administrator who reads Users & Access only (no users-access admin), with create and assign on DRAAK:
+-- may act on the person (admin_scope_all), may not appoint a Master.
+SELECT tests.reset_role();
+SELECT tests.seed_user('A', 'A.x374_uaread', 'crew');
+UPDATE public.account_memberships
+SET legacy_managed = false, kind = 'admin', vessel_scope = 'all', fleet_access = true, users_access_level = 'read', source = 'admin'
+WHERE user_id = tests.user_id('A.x374_uaread');
+SELECT tests.seed_rbac_role('A.x374_uaread', 'x111_assign', 'A.dra');
+SELECT tests.ok(public.has_capability_for(tests.user_id('A.x374_uaread'), 'vessel.crew.crew_profiles.create', tests.company_id('A'), tests.vessel_id('A.dra'))
+                AND public.has_capability_for(tests.user_id('A.x374_uaread'), 'vessel.crew.crew_assignments.assign', tests.company_id('A'), tests.vessel_id('A.dra'))
+                AND NOT coalesce(public.has_capability_for(tests.user_id('A.x374_uaread'), 'admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.dra')), false)
+                AND public.admin_may_act_on_user(tests.user_id('A.x374_uaread'), tests.user_id('A.x374_master'), tests.company_id('A'), tests.profile_id('A.x374_master')),
+  'setup: the read-only Users & Access administrator adds and assigns crew on DRAAK, may act on the ended person, and is no users-access admin');
+SELECT tests.as_user(tests.user_id('A.x374_uaread'));
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                                tests.profile_id('A.x374_master'), tests.vessel_id('A.dra'), pg_temp.pos('master')),
+  '42501', 'master_rehire_refused', 'D-198: a Master position needs users-access admin of the vessel');
+SELECT tests.as_user(tests.user_id('A.x111_viewer'));
+SELECT tests.throws(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                           tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '42501', 'the re-hire needs crew_profiles.create and crew_assignments.assign');
+SELECT tests.as_user(tests.user_id('A.x111_ext'));
+SELECT tests.throws(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                           tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '42501', 'an external viewer is refused');
+SELECT tests.as_user(tests.user_id('A.disabled'));
+SELECT tests.throws(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                           tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '42501', 'an inactive caller is refused');
+SELECT tests.as_user(tests.user_id('B.admin'));
+SELECT tests.throws(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5, 'position_id', %L))$q$,
+                           tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '42501', 'another tenant may not re-hire on DRAAK');
+SELECT tests.as_anon();
+SELECT tests.throws(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 5))$q$,
+                           tests.profile_id('A.x374_back'), tests.vessel_id('A.dra')),
+  '42501', 'anon may not call it');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE user_id IN (tests.user_id('A.x374_back'), tests.user_id('A.x374_master'), tests.user_id('A.x374_open'))
+                   AND coalesce(join_date, start_date) > current_date - 2)::integer, 0,
+  'atomic: no refusal left an assignment behind');
+SELECT tests.is((SELECT count(*) FROM public.crew_contracts WHERE profile_id = tests.profile_id('A.x374_back'))::integer, 0, 'nor a contract');
+
+-- The re-hire.
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT pg_temp.put('x374', public.crew_rehire_save(tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'),
+  jsonb_build_object('start_date', current_date + 5, 'position_id', pg_temp.pos('deckhand'), 'department_key', 'deck',
+                     'contract_type_key', 'permanent', 'leave_method', 'days_per_year', 'leave_days_per_year', 30),
+  '{"city": "Valletta"}'::jsonb));
+SELECT tests.reset_role();
+SELECT tests.ok((SELECT (j ->> 'assignment_id') IS NOT NULL AND (j ->> 'terms_id') IS NOT NULL AND (j ->> 'contract_id') IS NOT NULL AND (j ->> 'period_id') IS NOT NULL
+                 FROM (SELECT pg_temp.got('x374') AS j) AS x),
+  're-hire: the answer names the assignment, the terms, the draft contract and the On board period');
+SELECT tests.results_eq(
+  format($q$SELECT x.id, x.vessel_id, x.position, x.rank, x.department, x.join_date - current_date, x.created_by
+            FROM public.crew_assignments AS x WHERE x.user_id = %L AND public.crew_assignment_is_current(x.is_current, x.leave_date, x.end_date)$q$,
+         tests.user_id('A.x374_back')),
+  format($q$VALUES (%L::uuid, %L::uuid, 'Deckhand', 'Deckhand', 'Deck', 5, %L::uuid)$q$,
+         pg_temp.got('x374') ->> 'assignment_id', tests.vessel_id('A.dra'), tests.user_id('A.fleet_manager')),
+  'one current assignment on DRAAK from the start date, written as the caller');
+SELECT tests.results_eq(
+  format($q$SELECT t.id, t.assignment_id, t.start_date - current_date, t.end_date, t.contract_type_key, t.leave_days_per_year
+            FROM public.crew_assignment_terms AS t WHERE t.profile_id = %L AND t.end_date IS NULL$q$, tests.profile_id('A.x374_back')),
+  format($q$VALUES (%L::uuid, %L::uuid, 5, NULL::date, 'permanent', 30.00::numeric)$q$,
+         pg_temp.got('x374') ->> 'terms_id', pg_temp.got('x374') ->> 'assignment_id'),
+  'the new terms, linked to the new assignment; the old terms stay ended');
+SELECT tests.results_eq(
+  format($q$SELECT c.id, c.vessel_id, c.status, c.contract_type, c.position, c.department, c.start_date - current_date FROM public.crew_contracts AS c WHERE c.profile_id = %L$q$,
+         tests.profile_id('A.x374_back')),
+  format($q$VALUES (%L::uuid, %L::uuid, 'draft', 'permanent', 'Deckhand', 'Deck', 5)$q$, pg_temp.got('x374') ->> 'contract_id', tests.vessel_id('A.dra')),
+  'one draft contract');
+SELECT tests.results_eq(
+  format($q$SELECT a.id, a.vessel_id, a.leave_type_key, a.start_date - current_date, a.end_unknown, a.status::text
+            FROM public.frp_rotation_assignments AS a WHERE a.profile_id = %L AND a.start_date >= current_date$q$, tests.profile_id('A.x374_back')),
+  format($q$VALUES (%L::uuid, %L::uuid, 'on_board', 5, true, 'confirmed')$q$, pg_temp.got('x374') ->> 'period_id', tests.vessel_id('A.dra')),
+  'one On board period from the start date, end unknown');
+SELECT tests.is((SELECT city FROM public.crew_personal_details WHERE profile_id = tests.profile_id('A.x374_back')), 'Valletta', 'the personal details are applied');
+SELECT tests.is((SELECT count(*) FROM public.audit_logs WHERE entity_id = tests.profile_id('A.x374_back') AND new_values ->> 'via' = 'crew_rehire_save'
+                   AND new_values ->> 'assignment_id' = pg_temp.got('x374') ->> 'assignment_id')::integer, 1, 'one audit row');
+SELECT tests.ok(current_setting('storm.crew_engine', true) IS DISTINCT FROM 'on', 'the engine flag is not left on');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.throws_like(format($q$SELECT public.crew_rehire_save(%L, %L, jsonb_build_object('start_date', current_date + 9, 'position_id', %L))$q$,
+                                tests.profile_id('A.x374_back'), tests.vessel_id('A.dra'), pg_temp.pos('deckhand')),
+  '22023', 'on_crew_now', 'a second re-hire: they are on the crew now');
+SELECT tests.reset_role();
+
 -- ------------------------------------------------------------ 13. emitters and grants
 
 SELECT tests.ok(position('''crew_transfer_submitted''' IN (SELECT prosrc FROM pg_proc WHERE oid = 'public.transfer_crew_submit(uuid)'::regprocedure)) > 0
@@ -601,7 +778,7 @@ FROM unnest(ARRAY['public.transfer_crew_options(uuid, uuid)', 'public.transfer_c
                   'public.transfer_crew_review(uuid)', 'public.transfer_crew_acknowledge(uuid, jsonb)', 'public.transfer_crew_submit(uuid)',
                   'public.transfer_crew_decide(uuid, text, text)', 'public.transfer_crew_cancel(uuid, text)', 'public.transfer_crew(uuid)',
                   'public.transfer_crew_detail(uuid)', 'public.crew_transfers_for_profile(uuid)', 'public.crew_end_employment(uuid, uuid, date, text, text)',
-                  'public.crew_vessel_employment_history(uuid, text)', 'public.crew_rehire_prefill(uuid, uuid)']) AS f;
+                  'public.crew_vessel_employment_history(uuid, text)', 'public.crew_rehire_prefill(uuid, uuid)', 'public.crew_rehire_save(uuid, uuid, jsonb, jsonb)']) AS f;
 SELECT tests.ok(NOT has_function_privilege('authenticated', f, 'EXECUTE') AND NOT has_function_privilege('anon', f, 'EXECUTE')
                 AND has_function_privilege('service_role', f, 'EXECUTE'), 'internal or sweep: ' || f)
 FROM unnest(ARRAY['public.crew_transfer_next(text, text, boolean, boolean, boolean)', 'public.crew_end_reason_label(text)',
@@ -614,7 +791,8 @@ FROM unnest(ARRAY['public.transfer_crew_options(uuid, uuid)', 'public.transfer_c
                   'public.transfer_crew_review(uuid)', 'public.transfer_crew_acknowledge(uuid, jsonb)', 'public.transfer_crew_submit(uuid)',
                   'public.transfer_crew_decide(uuid, text, text)', 'public.transfer_crew_cancel(uuid, text)', 'public.transfer_crew(uuid)',
                   'public.transfer_crew_detail(uuid)', 'public.crew_transfers_for_profile(uuid)', 'public.crew_end_employment(uuid, uuid, date, text, text)',
-                  'public.crew_vessel_employment_history(uuid, text)', 'public.crew_rehire_prefill(uuid, uuid)', 'public.crew_transfers_complete_due(date)']) AS f;
+                  'public.crew_vessel_employment_history(uuid, text)', 'public.crew_rehire_prefill(uuid, uuid)', 'public.crew_rehire_save(uuid, uuid, jsonb, jsonb)',
+                  'public.crew_transfers_complete_due(date)']) AS f;
 SELECT tests.ok(NOT has_table_privilege('anon', 'public.crew_transfers', 'SELECT') AND NOT has_table_privilege('authenticated', 'public.crew_transfers', 'UPDATE')
                 AND NOT has_table_privilege('authenticated', 'public.crew_movements', 'INSERT'),
   'the transfer and movement tables stay read-only for the browser, nothing for anon');

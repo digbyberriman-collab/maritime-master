@@ -25,6 +25,11 @@
 --   9. crew_onboarding_save: gate (create on the vessel; wrong vessel and
 --      other company refused), terms rules, the advisory assignment link,
 --      second save updates, fill-only personal details;
+--  9b. a new employment (an inserted terms row) opens one draft contract
+--      and an On board period (D-375): never on the update path, an existing
+--      draft or active contract is not duplicated, a later confirmed period
+--      skips the period, a tenant contract key maps to rotational, and with
+--      planner_period_write missing the period is skipped cleanly;
 --  10. crew_find_duplicates: email, name, name and date of birth, the
 --      company only, gate;
 --  11. integrity guards and the next-of-kin columns (T-68);
@@ -604,6 +609,88 @@ SELECT tests.lives(format($q$SELECT public.crew_personal_details_apply(%L, '{"ci
   'fill-only: self fields are not restricted');
 SELECT tests.reset_role();
 
+-- ------------------------------------------------------------ 9b. a new employment opens a draft contract and an On board period (D-375)
+-- crew_onboarding_terms_write: only an inserted terms row opens them; the
+-- update path (the Employment tab's edit) opens neither.
+SELECT tests.is((SELECT count(*) FROM public.crew_contracts WHERE profile_id = tests.profile_id('A.pending'))::integer, 1,
+                'the first onboarding save of the pending placement opened one contract');
+SELECT tests.results_eq(
+  format($q$SELECT vessel_id, contract_type, position, department, start_date, status, created_by FROM public.crew_contracts WHERE profile_id = %L$q$, tests.profile_id('A.pending')),
+  format($q$VALUES (%L::uuid, 'rotational', 'Deckhand', 'Deck', current_date + 1, 'draft', %L::uuid)$q$, tests.vessel_id('A.dra'), tests.user_id('A.fleet_manager')),
+  'a draft on the vessel: the contract type, the position name, the department label and the start date of the terms');
+SELECT tests.results_eq(
+  format($q$SELECT vessel_id, leave_type_key, start_date, end_unknown, status::text FROM public.frp_rotation_assignments WHERE profile_id = %L$q$, tests.profile_id('A.pending')),
+  format($q$VALUES (%L::uuid, 'on_board', current_date + 3, true, 'confirmed')$q$, tests.vessel_id('A.dra')),
+  'and one On board period from the date joining the vessel, end unknown');
+SELECT tests.is((SELECT count(*) FROM public.crew_contracts WHERE profile_id = tests.profile_id('A.bosun'))::integer, 0,
+                'the bosun''s second save (the update path) opened no contract');
+SELECT tests.is((SELECT count(*) FROM public.frp_rotation_assignments WHERE profile_id = tests.profile_id('A.bosun'))::integer, 0,
+                'and no period');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$SELECT public.crew_onboarding_save(%L, %L, jsonb_build_object('start_date', current_date + 1, 'leave_method', 'none'))$q$,
+                          tests.profile_id('A.pending'), tests.vessel_id('A.dra')),
+  'the pending placement''s terms saved again on the same start date');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_contracts WHERE profile_id = tests.profile_id('A.pending'))::integer, 1,
+                'an edit of the same start date opens no second contract');
+SELECT tests.is((SELECT count(*) FROM public.frp_rotation_assignments WHERE profile_id = tests.profile_id('A.pending'))::integer, 1,
+                'nor a second period');
+
+-- A new start date for someone with an active contract on the vessel: no second contract.
+INSERT INTO public.crew_contracts (id, company_id, profile_id, vessel_id, contract_type, start_date, status)
+VALUES (tests.id('x375:contract:viewer'), tests.company_id('A'), tests.profile_id('A.viewer'), tests.vessel_id('A.dra'), 'permanent', current_date - 400, 'active');
+-- The helper is internal (definers and the service role): called here without a JWT.
+CREATE TEMP TABLE x375_w1 ON COMMIT DROP AS
+SELECT w.inserted, w.contract_id, w.period_id
+FROM public.crew_onboarding_terms_write(tests.company_id('A'), tests.profile_id('A.viewer'), tests.vessel_id('A.dra'), NULL,
+                                        jsonb_build_object('start_date', current_date + 2, 'contract_type_key', 'temporary'), tests.user_id('A.fleet_manager')) AS w;
+SELECT tests.ok((SELECT inserted AND contract_id IS NULL AND period_id IS NOT NULL FROM x375_w1),
+                'the helper''s answer: a new row, no contract (an active one exists), a period');
+SELECT tests.results_eq(
+  format($q$SELECT id, status FROM public.crew_contracts WHERE profile_id = %L$q$, tests.profile_id('A.viewer')),
+  format($q$VALUES (%L::uuid, 'active')$q$, tests.id('x375:contract:viewer')),
+  'an existing active contract is not duplicated');
+-- A confirmed period on or after the joining day: the On board period is skipped (the planner would refuse the overlap).
+CREATE TEMP TABLE x375_w2 ON COMMIT DROP AS
+SELECT w.inserted, w.contract_id, w.period_id
+FROM public.crew_onboarding_terms_write(tests.company_id('A'), tests.profile_id('A.viewer'), tests.vessel_id('A.dra'), NULL,
+                                        jsonb_build_object('start_date', current_date + 9), tests.user_id('A.fleet_manager')) AS w;
+SELECT tests.ok((SELECT inserted AND contract_id IS NULL AND period_id IS NULL FROM x375_w2),
+                'a later start while the On board period runs: no second contract, no overlapping period');
+SELECT tests.is((SELECT count(*) FROM public.frp_rotation_assignments WHERE profile_id = tests.profile_id('A.viewer'))::integer, 1,
+                'one period for the viewer');
+
+-- A tenant's own contract type key maps to rotational; a STORM key that crew_contracts allows is kept.
+INSERT INTO public.contract_types (company_id, key, label) VALUES (tests.company_id('A'), 'x375_relief', 'Relief');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$SELECT public.crew_onboarding_save(%L, %L, jsonb_build_object('start_date', current_date + 4, 'contract_type_key', 'x375_relief'))$q$,
+                          tests.profile_id('A.lister'), tests.vessel_id('A.dra')),
+  'the lister''s terms with the tenant key');
+SELECT tests.lives(format($q$SELECT public.crew_onboarding_save(%L, %L, jsonb_build_object('start_date', current_date + 4, 'contract_type_key', 'permanent'))$q$,
+                          tests.profile_id('A.editor'), tests.vessel_id('A.dra')),
+  'the editor''s terms with the permanent key');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT contract_type FROM public.crew_contracts WHERE profile_id = tests.profile_id('A.lister')), 'rotational', 'tenant key x375_relief: rotational');
+SELECT tests.is((SELECT contract_type FROM public.crew_contracts WHERE profile_id = tests.profile_id('A.editor')), 'permanent', 'permanent stays permanent');
+SELECT tests.is((SELECT position FROM public.crew_contracts WHERE profile_id = tests.profile_id('A.editor')), NULL, 'no position chosen: the contract names none');
+
+-- The planner engine not applied (planner_period_write missing): the period is skipped cleanly, the contract still opens.
+SAVEPOINT x375_no_planner;
+ALTER FUNCTION public.planner_period_write(uuid, uuid, uuid, uuid, text, date, date, boolean, text, boolean, uuid, boolean, uuid) RENAME TO planner_period_write_x375;
+SELECT tests.ok(to_regprocedure('public.planner_period_write(uuid,uuid,uuid,uuid,text,date,date,boolean,text,boolean,uuid,boolean,uuid)') IS NULL,
+                'simulated: planner_period_write is not there');
+CREATE TEMP TABLE x375_w3 ON COMMIT DROP AS
+SELECT w.inserted, w.contract_id, w.period_id
+FROM public.crew_onboarding_terms_write(tests.company_id('A'), tests.profile_id('A.joiner'), tests.vessel_id('A.dra'), NULL,
+                                        jsonb_build_object('start_date', current_date + 6), tests.user_id('A.fleet_manager')) AS w;
+SELECT tests.ok((SELECT inserted AND contract_id IS NOT NULL AND period_id IS NULL FROM x375_w3),
+                'without the planner engine: a new row and a contract, no period');
+SELECT tests.is((SELECT count(*) FROM public.frp_rotation_assignments WHERE profile_id = tests.profile_id('A.joiner'))::integer, 0, 'no period was written');
+ROLLBACK TO SAVEPOINT x375_no_planner;
+SELECT tests.ok(to_regprocedure('public.planner_period_write(uuid,uuid,uuid,uuid,text,date,date,boolean,text,boolean,uuid,boolean,uuid)') IS NOT NULL,
+                'planner_period_write is back');
+SELECT tests.ok(current_setting('storm.crew_engine', true) IS DISTINCT FROM 'on', 'the helper restored storm.crew_engine after the period write');
+
 -- ------------------------------------------------------------ 10. crew_find_duplicates
 
 UPDATE public.profiles SET email = 'shared-name@example.test' WHERE id = tests.profile_id('A.joiner');
@@ -664,6 +751,7 @@ SELECT tests.ok(NOT has_function_privilege('authenticated', 'public.crew_profile
                 AND NOT has_function_privilege('authenticated', 'public.crew_profile_can_edit(uuid)', 'EXECUTE')
                 AND NOT has_function_privilege('authenticated', 'public.crew_personal_field_groups()', 'EXECUTE')
                 AND NOT has_function_privilege('authenticated', 'public.crew_personal_details_apply(uuid, jsonb, uuid, boolean)', 'EXECUTE')
+                AND NOT has_function_privilege('authenticated', 'public.crew_onboarding_terms_write(uuid, uuid, uuid, uuid, jsonb, uuid)', 'EXECUTE')
                 AND NOT has_function_privilege('authenticated', 'public.crew_phone_split(text)', 'EXECUTE')
                 AND NOT has_function_privilege('authenticated', 'public.crew_country_from_text(text)', 'EXECUTE')
                 AND NOT has_function_privilege('authenticated', 'public.crew_profile_details_backfill()', 'EXECUTE')
@@ -684,7 +772,7 @@ SELECT tests.is_empty(
   $q$SELECT p.oid::regprocedure::text FROM pg_proc AS p
      WHERE p.pronamespace = 'public'::regnamespace
        AND p.proname IN ('crew_profile_visible', 'crew_visible_profile_ids', 'crew_profile_structural_vessels', 'crew_profile_can_edit',
-                         'crew_personal_field_groups', 'crew_personal_details_apply', 'crew_phone_split', 'crew_country_from_text',
+                         'crew_personal_field_groups', 'crew_personal_details_apply', 'crew_onboarding_terms_write', 'crew_phone_split', 'crew_country_from_text',
                          'crew_profile_resolve', 'crew_profile_summary', 'crew_personal_details_save', 'crew_languages_save',
                          'crew_onboarding_save', 'crew_find_duplicates', 'crew_profile_details_backfill',
                          'crew_personal_details_scope_guard', 'crew_languages_scope_guard', 'crew_assignment_terms_scope_guard')
@@ -707,5 +795,5 @@ SELECT tests.is_empty(
        AND NOT EXISTS (SELECT 1 FROM unnest(coalesce(p.proconfig, '{}')) AS c WHERE c = 'search_path=public')$q$,
   'every definer of this file pins search_path = public');
 SELECT tests.is((SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND prosecdef
-                 AND proname IN ('crew_profile_structural_vessels', 'crew_personal_field_groups', 'crew_personal_details_apply', 'crew_phone_split', 'crew_country_from_text')), 0::bigint,
+                 AND proname IN ('crew_profile_structural_vessels', 'crew_personal_field_groups', 'crew_personal_details_apply', 'crew_onboarding_terms_write', 'crew_phone_split', 'crew_country_from_text')), 0::bigint,
   'the pure helpers and the internal writer are not definers (they run as their caller, a gated definer)');

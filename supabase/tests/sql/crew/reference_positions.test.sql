@@ -432,6 +432,32 @@ SELECT tests.is(public.crew_position_for(tests.company_id('A'), tests.vessel_id(
 SELECT tests.as_user(tests.user_id('A.admin_dra'));
 SELECT tests.lives(format($q$SELECT * FROM public.crew_position_alias_set(%L, 'Underwater Welder', %L)$q$, tests.vessel_id('A.dra'), tests.id('pos:A.dra.tender_captain')),
   'an administrator holding the company-level answer re-points it');
+-- D-376: an administrator through a role bound to DRAAK (vessel scope) is
+-- no company-wide administrator: no company position, no re-point; their
+-- own vessel's positions and new titles stay theirs.
+SELECT tests.reset_role();
+SELECT tests.seed_role('x11_vessel_admin', 'vessel');
+INSERT INTO public.role_permissions (role_id, module_key, permission, scope)
+SELECT r.id, 'crew_certificates', 'admin', 'vessel' FROM public.roles AS r WHERE r.name = 'x11_vessel_admin';
+SELECT tests.seed_user('A', 'A.vbadmin', 'crew');
+SELECT tests.seed_assignment('A.vbadmin', 'A.dra', true, 'Third Officer');
+SELECT tests.seed_rbac_role('A.vbadmin', 'x11_vessel_admin', 'A.dra');
+SELECT tests.ok(public.has_capability_for(tests.user_id('A.vbadmin'), 'vessel.crew.crew_compliance.admin', tests.company_id('A'), tests.vessel_id('A.dra'))
+                AND NOT public.has_company_capability_for(tests.user_id('A.vbadmin'), 'vessel.crew.crew_compliance.admin', tests.company_id('A')),
+                'setup: A.vbadmin administers DRAAK through a vessel-bound role, not the company');
+SELECT tests.as_user(tests.user_id('A.vbadmin'));
+SELECT tests.throws_like($q$SELECT * FROM public.crew_position_create(tests.vessel_id('A.dra'), 'Hull Inspector Probe', 'deck', 'officer', NULL, false)$q$, '42501', 'positions_not_permitted',
+  'a vessel-bound administrator cannot add a company-wide position');
+SELECT tests.throws_like(format($q$SELECT * FROM public.crew_position_alias_set(%L, 'Underwater Welder', %L)$q$, tests.vessel_id('A.dra'), md5('storm.position.deckhand')::uuid),
+  '42501', 'alias_change_not_permitted', 'nor re-point a title mapped for the whole company');
+SELECT tests.lives($q$SELECT * FROM public.crew_position_create(tests.vessel_id('A.dra'), 'Hull Inspector Probe', 'deck', 'officer')$q$,
+  'but still adds a position to DRAAK (p_vessel_only)');
+SELECT tests.reset_role();
+SELECT tests.results_eq($q$SELECT vessel_id FROM public.positions WHERE key = 'hull_inspector_probe'$q$, $q$VALUES (tests.vessel_id('A.dra'))$q$,
+  'the vessel-bound administrator''s position is DRAAK''s, never the company''s');
+SELECT tests.is((SELECT position_id FROM public.position_aliases WHERE alias_key = 'underwater_welder' AND company_id = tests.company_id('A')), tests.id('pos:A.dra.tender_captain'),
+  'and the company alias still points where the company administrator put it');
+SELECT tests.as_user(tests.user_id('A.admin_dra'));
 SELECT tests.throws_like(format($q$SELECT * FROM public.crew_position_alias_set(%L, 'Master', %L)$q$, tests.vessel_id('A.dra'), md5('storm.position.deckhand')::uuid),
   '22023', 'alias_is_position', 'a title that names a position needs no alias');
 SELECT tests.throws_like(format($q$SELECT * FROM public.crew_position_alias_set(%L, '  ', %L)$q$, tests.vessel_id('A.dra'), md5('storm.position.deckhand')::uuid),

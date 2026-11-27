@@ -106,32 +106,41 @@ ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_s
 -- caller, another bucket or
 -- anything unknown -> false (fail closed).
 --
--- Read hooks (Phase 3 wave 1, platform-prep PP4; X5 PR-07, D-X5-17): in
--- read mode only, a well-formed path of an active member of the company
--- whose (module_key, entity_type) has a row in storage_path_read_hooks()
--- is also readable when that row's predicate, called as
--- predicate(auth.uid(), <path segment id_segment>::uuid), answers true. A
--- predicate is called only when to_regprocedure finds its exact
--- signature, so a hook whose owner file is not applied yet changes
--- nothing; a NULL answer is a no. Today one hook: fleet_document ->
--- public.fleet_document_file_readable(uuid, uuid) on segment 5 (the
--- document id of <company>/fleet/documents/fleet_document/<document_id>/…),
--- so vessel crew without fleet reach open the fleet documents published to
--- them. Write mode is unchanged. The D-214 read gate (PR-X1-L) extends the
--- same list with 'require' rows (a per-kind predicate that must also
--- answer true); until then any effect other than 'allow' denies.
+-- Read hooks (Phase 3 wave 1, platform-prep PP4; X5 PR-07, D-X5-17;
+-- per file since D-382): in read mode only, a well-formed path of an
+-- active member of the company whose (module_key, entity_type) has a row in
+-- storage_path_read_hooks() is decided by that row: the path's second
+-- segment must equal the row's scope ('fleet' for fleet_document; any other
+-- folder, a vessel id in place of /fleet/ included, is refused), and the
+-- row's predicate, called as predicate(auth.uid(), <path segment
+-- id_segment>::uuid, <the whole name>), gives the final answer for reads:
+-- the generic fleet-reach rule no longer opens such a path, so a library
+-- viewer with fleet reach reads what the predicate allows (no drafts) and
+-- not every file stored for the record. A predicate is called only when
+-- to_regprocedure finds its exact (uuid, uuid, text) signature; while it is
+-- missing the path falls back to the generic rule, as before the hook (its
+-- owner file is not applied yet); a NULL answer is a no. Today one hook:
+-- fleet_document -> public.fleet_document_file_readable(uuid, uuid, text)
+-- on segment 5 (the document id of
+-- <company>/fleet/documents/fleet_document/<document_id>/…), which answers
+-- per version file. Write mode is unchanged. The D-214 read gate (PR-X1-L)
+-- extends the same list with 'require' rows (a per-kind predicate that must
+-- also answer true); until then any effect other than 'allow' denies.
 
 -- The named per-entity read hooks of storage_path_allowed (read mode).
 -- Columns: the path's module and entity type, the predicate's exact
--- regprocedure text ((uuid, uuid) -> boolean, user first), the path
--- segment that holds the id it is asked about, and the effect.
+-- regprocedure text ((uuid, uuid, text) -> boolean: user, the id at
+-- id_segment, the object name), the path segment that holds the id, the
+-- effect, and the scope (the required second segment: 'fleet').
+-- The return type changed (scope column, D-382): drop before recreating.
+DROP FUNCTION IF EXISTS public.storage_path_read_hooks();
 CREATE OR REPLACE FUNCTION public.storage_path_read_hooks()
-RETURNS TABLE (module_key text, entity_type text, predicate text, id_segment integer, effect text)
+RETURNS TABLE (module_key text, entity_type text, predicate text, id_segment integer, effect text, scope text)
 LANGUAGE sql
 IMMUTABLE
 SET search_path = public
 AS $$
-  VALUES ('documents'::text, 'fleet_document'::text, 'public.fleet_document_file_readable(uuid,uuid)'::text, 5, 'allow'::text)
+  VALUES ('documents'::text, 'fleet_document'::text, 'public.fleet_document_file_readable(uuid,uuid,text)'::text, 5, 'allow'::text, 'fleet'::text)
 $$;
 
 CREATE OR REPLACE FUNCTION public.storage_path_allowed(p_bucket text, p_name text, p_for_write boolean)
@@ -171,23 +180,25 @@ BEGIN
   IF NOT public.user_belongs_to_company(v_uid, v_company) THEN
     RETURN false;
   END IF;
-  -- Read hooks (read mode only): a matching 'allow' hook whose predicate
-  -- exists and answers true opens the path; a malformed hook denies.
+  -- Read hooks (read mode only, D-382): a path whose (module, entity) has
+  -- a hook must sit under the hook's scope folder, and the hook's
+  -- predicate, asked about the id and the whole name, is the final answer;
+  -- a malformed hook denies; a hook whose predicate is not in the database
+  -- yet leaves the generic rule in place.
   IF NOT p_for_write THEN
     FOR v_hook IN
-      SELECT h.predicate, h.id_segment, h.effect FROM public.storage_path_read_hooks() AS h
+      SELECT h.predicate, h.id_segment, h.effect, h.scope FROM public.storage_path_read_hooks() AS h
       WHERE h.module_key = v_parts[3] AND h.entity_type = v_parts[4]
     LOOP
       IF v_hook.effect IS DISTINCT FROM 'allow' OR v_hook.id_segment IS NULL OR v_hook.id_segment NOT BETWEEN 1 AND 6
-         OR v_parts[v_hook.id_segment] !~ v_uuid OR v_hook.predicate !~ '^public\.[a-z_][a-z0-9_]*\(uuid,uuid\)$' THEN
+         OR v_parts[v_hook.id_segment] !~ v_uuid OR v_hook.predicate !~ '^public\.[a-z_][a-z0-9_]*\(uuid,uuid,text\)$'
+         OR v_hook.scope IS NULL OR v_parts[2] IS DISTINCT FROM v_hook.scope THEN
         RETURN false;
       END IF;
       IF to_regprocedure(v_hook.predicate) IS NOT NULL THEN
         v_hook_fn := substring(v_hook.predicate FROM '^public\.([a-z_][a-z0-9_]*)\(');
-        EXECUTE format('SELECT public.%I($1, $2)', v_hook_fn) INTO v_hook_ok USING v_uid, v_parts[v_hook.id_segment]::uuid;
-        IF coalesce(v_hook_ok, false) THEN
-          RETURN true;
-        END IF;
+        EXECUTE format('SELECT public.%I($1, $2, $3)', v_hook_fn) INTO v_hook_ok USING v_uid, v_parts[v_hook.id_segment]::uuid, p_name;
+        RETURN coalesce(v_hook_ok, false);
       END IF;
     END LOOP;
   END IF;
@@ -884,8 +895,8 @@ GRANT EXECUTE ON FUNCTION public.unlink_records(uuid) TO authenticated;
 COMMENT ON TABLE public.file_objects IS 'One stored file of the private records bucket (gap/08 UP1-UP3; C7): its path <company>/<vessel|fleet>/<module>/<entity_type>/<entity_id>/<uuid>-<name>, type, size and hash. Read: record_readable (company + reach). No client writes: register_file_object only. Removed softly; legal hold blocks removal.';
 COMMENT ON TABLE public.record_attachments IS 'A file attached to a record (envelope) or to an entity (gap/08 UP2): section, caption, versions, order. Read: record_readable. No client writes: attach_record_file / remove_record_attachment only (soft remove).';
 COMMENT ON TABLE public.record_links IS 'Generic links between records, or from a record to an item (C8): related, duplicate_of, follow_up, caused_by, parent. company_id / vessel_id are stamped from the from-record by trg_record_links_scope (CC-12) and read through record_readable. No client writes: link_records / unlink_records only (soft remove).';
-COMMENT ON FUNCTION public.storage_path_allowed(text, text, boolean) IS 'The C7 path rule of the records bucket for auth.uid(): six segments, an active member of the company, fleet reach (or a company actor) for fleet paths, reach to the vessel otherwise; for a write, never an external viewer of the company (record_user_is_external; review round 4; company actors keep the fleet path). Read mode also consults storage_path_read_hooks(): a matching allow hook whose predicate exists (to_regprocedure) and answers true opens the path (fleet_document -> fleet_document_file_readable, X5 PR-07; PP4). Module read and write capabilities come with the streams (BUILD-PLAN open item (1); D-132, D-214). Unknown anything -> false.';
-COMMENT ON FUNCTION public.storage_path_read_hooks() IS 'The named per-entity read hooks of storage_path_allowed (read mode; PP4): (module_key, entity_type) -> a (uuid user, uuid id) -> boolean predicate asked about path segment id_segment, effect allow. Today fleet_document -> public.fleet_document_file_readable(uuid,uuid) on segment 5 (X5 PR-07). The D-214 read gate (PR-X1-L) adds require rows. Internal: no grant.';
+COMMENT ON FUNCTION public.storage_path_allowed(text, text, boolean) IS 'The C7 path rule of the records bucket for auth.uid(): six segments, an active member of the company, fleet reach (or a company actor) for fleet paths, reach to the vessel otherwise; for a write, never an external viewer of the company (record_user_is_external; review round 4; company actors keep the fleet path). Read mode also consults storage_path_read_hooks() (D-382): a path whose module and entity have a hook must sit under the hook''s scope folder (fleet for fleet_document), and the hook''s predicate (user, the id, the whole name), when to_regprocedure finds it, is the final read answer (fleet_document -> fleet_document_file_readable(uuid, uuid, text), per version file; X5 PR-07; PP4). Module read and write capabilities come with the streams (BUILD-PLAN open item (1); D-132, D-214). Unknown anything -> false.';
+COMMENT ON FUNCTION public.storage_path_read_hooks() IS 'The named per-entity read hooks of storage_path_allowed (read mode; PP4, D-382): (module_key, entity_type) -> a (uuid user, uuid id, text name) -> boolean predicate asked about path segment id_segment and the whole object name, effect allow, scope the required second path segment. Today fleet_document -> public.fleet_document_file_readable(uuid,uuid,text) on segment 5, scope fleet (X5 PR-07). The hook''s answer is final for reads. The D-214 read gate (PR-X1-L) adds require rows. Internal: no grant.';
 COMMENT ON FUNCTION public.record_links_scope() IS 'Trigger: a link''s company and vessel are its from-record''s (a client value is overwritten).';
 COMMENT ON FUNCTION public.register_file_object(text, text, text, text, bigint, text) IS 'Registers an uploaded object of the records bucket (path allowed, object stored by the caller, size and type checked, a given sha256 64 lower-case hex). Idempotent on (bucket, path); the uploader registering again with a sha256 fills a missing hash (a stored hash is never overwritten). The hash is client-asserted.';
 COMMENT ON FUNCTION public.attach_record_file(uuid, uuid, text, text, uuid) IS 'Attaches a registered file to a record (or its entity); the caller may write the file and the record (record_caller_may_write) or is a company actor (42501 otherwise); refuses closed / void records unless the kind allows late evidence. Event attachment.added.';

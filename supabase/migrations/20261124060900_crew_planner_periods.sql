@@ -121,9 +121,13 @@
 -- reach to the request's vessel; manning vessel.crew.crew_scheduling.view.
 -- External viewers and inactive callers are refused; a person or request of
 -- another company reads as unknown (P0002). leave_types reads for active
--- users; crew_leave_request_periods through its request (the legacy
--- company-wide crew_leave_requests read) and the company;
--- crew_leave_settings with crew_scheduling.view on the vessel. The status
+-- users; crew_leave_request_periods (they name the leave type, medical or
+-- compassionate included) by the requester and by the vessel's schedulers
+-- (crew_scheduling.view) and leave approvers, not external viewers, in the
+-- company (D-377; the legacy company-wide reads of crew_leave_requests,
+-- crew_leave_entries and frp_rotation_assignments are unchanged here and
+-- open for the owner, D-378); crew_leave_settings with crew_scheduling.view
+-- on the vessel. The status
 -- and approval columns of frp_rotation_assignments and the status and
 -- reviewer columns of crew_leave_requests change only under the X1 engine
 -- flag (storm.crew_engine) for signed-in writers; a legacy planner writer
@@ -396,7 +400,7 @@ CREATE TABLE IF NOT EXISTS public.crew_leave_settings (
   CONSTRAINT crew_leave_settings_hod_step_check CHECK (hod_step IN ('off', 'nudge', 'required'))
 );
 
-COMMENT ON TABLE public.crew_leave_request_periods IS 'The periods of a crew leave request (gap/04 C50, T-71): each period has its own leave type, start and end (or end unknown) and becomes its own confirmed planner period when the request is approved. The request row keeps the first period''s day code and the overall span for legacy readers. Read through the request (the company''s leave requests) by members of its company; written only by the planner definers.';
+COMMENT ON TABLE public.crew_leave_request_periods IS 'The periods of a crew leave request (gap/04 C50, T-71): each period has its own leave type, start and end (or end unknown) and becomes its own confirmed planner period when the request is approved. The request row keeps the first period''s day code and the overall span for legacy readers. Read by members of its company who are the requester (crew_id / profile_id), or who hold vessel.crew.crew_scheduling.view or hris.leave_rotation.leave_requests.approve on the request''s vessel and are not external viewers (D-377); never company-wide; written only by the planner definers.';
 COMMENT ON TABLE public.crew_leave_settings IS 'A vessel''s leave approval settings (gap/04 C52, W7): hod_step off (no head-of-department review), nudge (the default: the head of the requester''s department may review first, the approver decides either way) or required (final approval waits for the review, except for the Master and fleet approvers). Read with vessel.crew.crew_scheduling.view on the vessel; written by planner_leave_settings_save.';
 
 -- ---------------------------------------------------------------- pure rules (TS mirrors in lib/periods.ts and lib/manning.ts)
@@ -539,7 +543,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_signed boolean := auth.uid() IS NOT NULL;
-  v_engine boolean := current_setting('storm.crew_engine', true) = 'on';
+  v_engine boolean := coalesce(current_setting('storm.crew_engine', true), '') = 'on';
   v_from_rotation boolean := false;
   v_profile_company uuid;
   v_profile_user uuid;
@@ -663,7 +667,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_signed boolean := auth.uid() IS NOT NULL;
-  v_engine boolean := current_setting('storm.crew_engine', true) = 'on';
+  v_engine boolean := coalesce(current_setting('storm.crew_engine', true), '') = 'on';
   v_company uuid;
 BEGIN
   IF TG_OP = 'DELETE' THEN
@@ -2139,12 +2143,24 @@ CREATE POLICY leave_types_select_active ON public.leave_types
   FOR SELECT TO authenticated
   USING ((SELECT public.user_is_active((SELECT auth.uid()))));
 
+-- A request's periods name its leave types (medical, compassionate ...):
+-- read by the requester and by the vessel's schedulers and leave approvers
+-- (not external viewers), never company-wide (D-377).
 DROP POLICY IF EXISTS crew_leave_request_periods_select_request ON public.crew_leave_request_periods;
-CREATE POLICY crew_leave_request_periods_select_request ON public.crew_leave_request_periods
+DROP POLICY IF EXISTS crew_leave_request_periods_select_scoped ON public.crew_leave_request_periods;
+CREATE POLICY crew_leave_request_periods_select_scoped ON public.crew_leave_request_periods
   FOR SELECT TO authenticated
   USING (
     company_id = (SELECT public.get_user_company_id((SELECT auth.uid())))
-    AND request_id IN (SELECT r.id FROM public.crew_leave_requests AS r)
+    AND EXISTS (
+      SELECT 1 FROM public.crew_leave_requests AS r
+      WHERE r.id = request_id
+        AND (r.crew_id = (SELECT auth.uid())
+             OR r.profile_id = (SELECT public.my_profile_id())
+             OR ((r.vessel_id IN (SELECT public.crew_cap_vessel_ids('vessel.crew.crew_scheduling.view'))
+                  OR r.vessel_id IN (SELECT public.crew_cap_vessel_ids('hris.leave_rotation.leave_requests.approve')))
+                 AND NOT (SELECT public.crew_caller_is_external())))
+    )
   );
 
 DROP POLICY IF EXISTS crew_leave_settings_select_scheduling ON public.crew_leave_settings;

@@ -18,6 +18,8 @@
 --   crew_personal_details_save(), crew_languages_save(),
 --   crew_onboarding_save(), crew_find_duplicates()
 -- Internal: crew_personal_field_groups(), crew_personal_details_apply(),
+--   crew_onboarding_terms_write() (the terms write Add crew and the re-hire
+--   share, D-375),
 --   crew_phone_split(), crew_country_from_text(),
 --   crew_profile_details_backfill() (the seed)
 -- Triggers: crew_personal_details_scope_guard(),
@@ -72,7 +74,12 @@
 -- (42501 crew_identity_locked). assignment_id is an advisory link to the
 -- current assignment when there is one (no trigger on the shared
 -- crew_assignments, D-X1-2): readers match terms to an assignment by
--- person, vessel and dates.
+-- person, vessel and dates. The validation and the write live in the
+-- internal crew_onboarding_terms_write(), which crew_rehire_save (061100)
+-- shares. A new employment's terms (the row is inserted, not updated) open
+-- a draft crew_contracts row and, with the planner engine (060900), an On
+-- board period from the day they join (D-375); a second save of the same
+-- start date (the Employment tab's edit) opens neither.
 --
 -- Duplicates (crew_find_duplicates, Add Crew): crew_profiles.create on the
 -- vessel; the people of the caller's company with the same email, or the
@@ -1332,32 +1339,38 @@ BEGIN
 END;
 $$;
 
--- Add Crew's second step (X1-03B; gap/04 W1): stores the employment terms
--- of a person on the vessel's crew and fills their personal details. Gate:
--- vessel.crew.crew_profiles.create on the vessel (crew_vessel_gate: P0002
--- unknown vessel, 42501), no external viewer; the profile must be of the
--- vessel's company and on its crew (a current assignment on it, or the
--- pending placement imported to it; 42501 crew_onboarding_refused). p_terms
--- keys: start_date (required), position_id, department_key,
--- date_joining_vessel, review_date, contract_type_key, leave_method,
--- leave_days_per_year, leave_ratio_on, leave_ratio_off,
--- place_of_embarkation; the end fields are the employment slices'. One row
--- per person, vessel and start date (a second save updates it).
--- assignment_id links the current assignment when there is one (advisory,
--- D-X1-2). p_personal (optional) is a crew_personal_details_save payload;
--- a creator who is not an editor fills blanks only. Returns the terms row.
-CREATE OR REPLACE FUNCTION public.crew_onboarding_save(p_profile_id uuid, p_vessel_id uuid, p_terms jsonb, p_personal jsonb DEFAULT NULL)
-RETURNS public.crew_assignment_terms
+-- The employment terms write shared by Add crew (crew_onboarding_save) and
+-- the re-hire (crew_rehire_save, 061100): validates p_terms (the keys and
+-- refusals crew_onboarding_save documents) and writes the row (one per
+-- person, vessel and start date; a second save of the same start date
+-- updates it). Only when the row is new (RETURNING xmax = 0; D-375):
+-- (a) a draft crew_contracts row for the person and the vessel unless one
+-- is draft or active there already (or for no vessel): contract_type is
+-- contract_type_key when crew_contracts allows it (permanent, fixed_term,
+-- rotational, temporary, freelance, probationary, seasonal, daywork), else
+-- 'rotational' (a tenant key); position and department are the chosen
+-- position's name and the department's label; (b) when the planner engine
+-- is applied (planner_period_write, 060900), an On board period from
+-- coalesce(date_joining_vessel, start_date), end unknown, unless the person
+-- has a confirmed period on or after that day (the planner's overlap rule
+-- would refuse it). Never on the update path, so the Employment tab's edit
+-- and transfer_crew (its own terms insert) open neither. The caller has
+-- gated and checked the person and vessel. Internal: definers only.
+CREATE OR REPLACE FUNCTION public.crew_onboarding_terms_write(
+  p_company uuid,
+  p_profile_id uuid,
+  p_vessel_id uuid,
+  p_assignment_id uuid,
+  p_terms jsonb,
+  p_uid uuid
+)
+RETURNS TABLE (terms public.crew_assignment_terms, inserted boolean, contract_id uuid, period_id uuid)
 LANGUAGE plpgsql
 VOLATILE
-SECURITY DEFINER
 SET search_path = public
 AS $$
+#variable_conflict use_column
 DECLARE
-  v_uid uuid := auth.uid();
-  v_company uuid;
-  v_profile public.profiles;
-  v_assignment uuid;
   v_key text;
   v_start date;
   v_joining date;
@@ -1370,27 +1383,15 @@ DECLARE
   v_on integer;
   v_off integer;
   v_port text;
+  v_terms_id uuid;
+  v_inserted boolean;
   v_row public.crew_assignment_terms;
+  v_contract_id uuid;
+  v_period_id uuid;
+  v_from date;
+  v_has_later boolean;
+  v_prev text;
 BEGIN
-  v_company := public.crew_vessel_gate('vessel.crew.crew_profiles.create', p_vessel_id, 'You can''t add crew to this vessel.');
-  IF public.crew_caller_is_external() THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted', DETAIL = 'You can''t add crew to this vessel.';
-  END IF;
-  SELECT * INTO v_profile FROM public.profiles AS p WHERE p.id = p_profile_id FOR UPDATE;
-  IF NOT FOUND OR v_profile.company_id IS DISTINCT FROM v_company THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_onboarding_refused', DETAIL = 'This person is not on this vessel''s crew.';
-  END IF;
-  SELECT ca.id INTO v_assignment
-  FROM public.crew_assignments AS ca
-  WHERE v_profile.user_id IS NOT NULL AND ca.user_id = v_profile.user_id AND ca.vessel_id = p_vessel_id
-    AND coalesce(ca.is_current, false)
-    AND NOT coalesce(coalesce(ca.leave_date, ca.end_date) <= current_date, false)
-  ORDER BY coalesce(ca.join_date, ca.start_date) DESC NULLS LAST, ca.id
-  LIMIT 1;
-  IF v_assignment IS NULL AND NOT (coalesce(v_profile.is_imported, false) AND v_profile.imported_vessel_id = p_vessel_id) THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_onboarding_refused', DETAIL = 'This person is not on this vessel''s crew.';
-  END IF;
-
   IF p_terms IS NULL OR jsonb_typeof(p_terms) <> 'object' THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'payload_invalid', DETAIL = 'The employment details could not be read.';
   END IF;
@@ -1428,7 +1429,7 @@ BEGIN
   IF v_position IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM public.positions AS pos
     WHERE pos.id = v_position AND pos.is_active
-      AND (pos.company_id IS NULL OR pos.company_id = v_company)
+      AND (pos.company_id IS NULL OR pos.company_id = p_company)
       AND (pos.vessel_id IS NULL OR pos.vessel_id = p_vessel_id)
   ) THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'position_unknown', DETAIL = 'Choose a position from this vessel''s list.', HINT = 'position_id';
@@ -1438,7 +1439,7 @@ BEGIN
   END IF;
   IF v_contract IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM public.contract_types AS ct
-    WHERE ct.key = v_contract AND ct.is_active AND (ct.company_id IS NULL OR ct.company_id = v_company)
+    WHERE ct.key = v_contract AND ct.is_active AND (ct.company_id IS NULL OR ct.company_id = p_company)
   ) THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'contract_type_unknown', DETAIL = 'Choose a contract type from the list.', HINT = 'contract_type_key';
   END IF;
@@ -1458,8 +1459,8 @@ BEGIN
       review_date, contract_type_key, leave_method, leave_days_per_year, leave_ratio_on, leave_ratio_off,
       place_of_embarkation, created_by, updated_by
     ) VALUES (
-      v_company, p_profile_id, p_vessel_id, v_assignment, v_position, v_department, v_start, v_joining,
-      v_review, v_contract, v_method, v_days, v_on, v_off, v_port, v_uid, v_uid
+      p_company, p_profile_id, p_vessel_id, p_assignment_id, v_position, v_department, v_start, v_joining,
+      v_review, v_contract, v_method, v_days, v_on, v_off, v_port, p_uid, p_uid
     )
     ON CONFLICT (profile_id, vessel_id, start_date) DO UPDATE SET
       assignment_id = coalesce(EXCLUDED.assignment_id, t.assignment_id),
@@ -1474,10 +1475,104 @@ BEGIN
       leave_ratio_off = EXCLUDED.leave_ratio_off,
       place_of_embarkation = EXCLUDED.place_of_embarkation,
       updated_by = EXCLUDED.updated_by
-    RETURNING t.* INTO v_row;
+    RETURNING t.id, (t.xmax = 0) INTO v_terms_id, v_inserted;
   EXCEPTION WHEN check_violation THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'field_invalid', DETAIL = 'One of the employment details is not allowed. Check the dates and the leave allowance.';
   END;
+
+  SELECT * INTO v_row FROM public.crew_assignment_terms AS x WHERE x.id = v_terms_id;
+
+  IF v_inserted THEN
+    -- (a) the draft contract of the new employment (D-375).
+    IF NOT EXISTS (
+      SELECT 1 FROM public.crew_contracts AS c
+      WHERE c.profile_id = p_profile_id AND c.status IN ('draft', 'active')
+        AND (c.vessel_id = p_vessel_id OR c.vessel_id IS NULL)
+    ) THEN
+      INSERT INTO public.crew_contracts (company_id, profile_id, vessel_id, contract_type, position, department, start_date,
+                                         status, created_by, updated_by)
+      VALUES (p_company, p_profile_id, p_vessel_id,
+              CASE WHEN v_contract IN ('permanent', 'fixed_term', 'rotational', 'temporary', 'freelance', 'probationary', 'seasonal', 'daywork')
+                   THEN v_contract ELSE 'rotational' END,
+              (SELECT pos.name FROM public.positions AS pos WHERE pos.id = v_position),
+              (SELECT d.label FROM public.departments AS d WHERE d.key = v_department),
+              v_start, 'draft', p_uid, p_uid)
+      RETURNING id INTO v_contract_id;
+    END IF;
+
+    -- (b) the On board period from the day they join (D-375), through the planner engine when it is applied.
+    IF to_regprocedure('public.planner_period_write(uuid,uuid,uuid,uuid,text,date,date,boolean,text,boolean,uuid,boolean,uuid)') IS NOT NULL THEN
+      v_from := coalesce(v_joining, v_start);
+      EXECUTE $q$
+        SELECT EXISTS (SELECT 1 FROM public.frp_rotation_assignments AS a
+                       WHERE a.profile_id = $1 AND a.status IN ('confirmed', 'complete') AND a.leave_type_key IS NOT NULL
+                         AND (a.end_unknown OR a.end_date >= $2))
+            OR NOT EXISTS (SELECT 1 FROM public.leave_types AS lt WHERE lt.key = 'on_board')$q$
+        INTO v_has_later USING p_profile_id, v_from;
+      IF NOT v_has_later THEN
+        v_prev := current_setting('storm.crew_engine', true);
+        EXECUTE 'SELECT (public.planner_period_write($1, $2, $3, NULL, ''on_board'', $4, NULL, true, NULL, false, NULL, false, $5)).id'
+          INTO v_period_id USING p_vessel_id, p_company, p_profile_id, v_from, p_uid;
+        PERFORM set_config('storm.crew_engine', coalesce(v_prev, ''), true);
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN QUERY SELECT v_row, v_inserted, v_contract_id, v_period_id;
+END;
+$$;
+
+-- Add Crew's second step (X1-03B; gap/04 W1): stores the employment terms
+-- of a person on the vessel's crew and fills their personal details. Gate:
+-- vessel.crew.crew_profiles.create on the vessel (crew_vessel_gate: P0002
+-- unknown vessel, 42501), no external viewer; the profile must be of the
+-- vessel's company and on its crew (a current assignment on it, or the
+-- pending placement imported to it; 42501 crew_onboarding_refused). p_terms
+-- keys: start_date (required), position_id, department_key,
+-- date_joining_vessel, review_date, contract_type_key, leave_method,
+-- leave_days_per_year, leave_ratio_on, leave_ratio_off,
+-- place_of_embarkation; the end fields are the employment slices'. One row
+-- per person, vessel and start date (a second save updates it).
+-- assignment_id links the current assignment when there is one (advisory,
+-- D-X1-2). p_personal (optional) is a crew_personal_details_save payload;
+-- a creator who is not an editor fills blanks only. The validation and the
+-- write are crew_onboarding_terms_write's (a new row also opens the draft
+-- contract and the On board period, D-375). Returns the terms row.
+CREATE OR REPLACE FUNCTION public.crew_onboarding_save(p_profile_id uuid, p_vessel_id uuid, p_terms jsonb, p_personal jsonb DEFAULT NULL)
+RETURNS public.crew_assignment_terms
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_company uuid;
+  v_profile public.profiles;
+  v_assignment uuid;
+  v_row public.crew_assignment_terms;
+BEGIN
+  v_company := public.crew_vessel_gate('vessel.crew.crew_profiles.create', p_vessel_id, 'You can''t add crew to this vessel.');
+  IF public.crew_caller_is_external() THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted', DETAIL = 'You can''t add crew to this vessel.';
+  END IF;
+  SELECT * INTO v_profile FROM public.profiles AS p WHERE p.id = p_profile_id FOR UPDATE;
+  IF NOT FOUND OR v_profile.company_id IS DISTINCT FROM v_company THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_onboarding_refused', DETAIL = 'This person is not on this vessel''s crew.';
+  END IF;
+  SELECT ca.id INTO v_assignment
+  FROM public.crew_assignments AS ca
+  WHERE v_profile.user_id IS NOT NULL AND ca.user_id = v_profile.user_id AND ca.vessel_id = p_vessel_id
+    AND coalesce(ca.is_current, false)
+    AND NOT coalesce(coalesce(ca.leave_date, ca.end_date) <= current_date, false)
+  ORDER BY coalesce(ca.join_date, ca.start_date) DESC NULLS LAST, ca.id
+  LIMIT 1;
+  IF v_assignment IS NULL AND NOT (coalesce(v_profile.is_imported, false) AND v_profile.imported_vessel_id = p_vessel_id) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_onboarding_refused', DETAIL = 'This person is not on this vessel''s crew.';
+  END IF;
+
+  SELECT (w.terms).* INTO v_row
+  FROM public.crew_onboarding_terms_write(v_company, p_profile_id, p_vessel_id, v_assignment, p_terms, v_uid) AS w;
 
   IF p_personal IS NOT NULL AND p_personal <> '{}'::jsonb THEN
     PERFORM public.crew_personal_details_apply(p_profile_id, p_personal, v_uid, NOT public.crew_profile_can_edit(p_profile_id));
@@ -1668,6 +1763,8 @@ REVOKE ALL ON FUNCTION public.crew_personal_details_save(uuid, jsonb) FROM PUBLI
 GRANT EXECUTE ON FUNCTION public.crew_personal_details_save(uuid, jsonb) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.crew_languages_save(uuid, jsonb) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.crew_languages_save(uuid, jsonb) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.crew_onboarding_terms_write(uuid, uuid, uuid, uuid, jsonb, uuid) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.crew_onboarding_terms_write(uuid, uuid, uuid, uuid, jsonb, uuid) TO service_role;
 REVOKE ALL ON FUNCTION public.crew_onboarding_save(uuid, uuid, jsonb, jsonb) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.crew_onboarding_save(uuid, uuid, jsonb, jsonb) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.crew_find_duplicates(uuid, text, text, text, date) FROM PUBLIC, anon, authenticated, service_role;
@@ -1702,7 +1799,8 @@ COMMENT ON FUNCTION public.crew_profile_resolve(uuid, uuid) IS 'The profiles.id 
 COMMENT ON FUNCTION public.crew_profile_summary(uuid, uuid) IS 'The crew profile header (gap/04 C16): names, crew number, position and department, status on the vessel today, login state, previous and next person in the vessel''s rank order among those the caller may see, the caller''s rights (own, can_edit identity, can_edit_self) and the tabs the caller may open (X1 spec §4). P0002 unless the caller may see the person and the vessel is the caller''s company''s.';
 COMMENT ON FUNCTION public.crew_personal_details_save(uuid, jsonb) IS 'Saves personal details (gap/04 C17, C20, C21): self fields by the person or an editor, identity fields (names, title, sex, birth, nationalities, residency, work email, crew number, embarkation) by an editor only (hr_can_edit or crew_profiles.edit on a structural vessel). Unknown keys refused (22023 field_unknown). Returns the row.';
 COMMENT ON FUNCTION public.crew_languages_save(uuid, jsonb) IS 'Replaces a person''s languages atomically (gap/04 C17): up to four, slot 1 the mother tongue, slots 2-4 with a proficiency. Gate: the person or an editor. Returns the rows.';
-COMMENT ON FUNCTION public.crew_onboarding_save(uuid, uuid, jsonb, jsonb) IS 'Add Crew''s second step (X1-03B; gap/04 W1): stores the employment terms of a person on the vessel''s crew (current assignment or pending placement of the caller''s company) and fills their personal details (blanks only for a non-editor). Gate: vessel.crew.crew_profiles.create on the vessel, no external viewer. assignment_id is an advisory link (D-X1-2). Returns the terms row.';
+COMMENT ON FUNCTION public.crew_onboarding_save(uuid, uuid, jsonb, jsonb) IS 'Add Crew''s second step (X1-03B; gap/04 W1): stores the employment terms of a person on the vessel''s crew (current assignment or pending placement of the caller''s company) and fills their personal details (blanks only for a non-editor). Gate: vessel.crew.crew_profiles.create on the vessel, no external viewer. assignment_id is an advisory link (D-X1-2). The write is crew_onboarding_terms_write''s: a new row opens a draft contract and an On board period (D-375), an update opens neither. Returns the terms row.';
+COMMENT ON FUNCTION public.crew_onboarding_terms_write(uuid, uuid, uuid, uuid, jsonb, uuid) IS 'Internal (D-375): the employment terms validation and write shared by crew_onboarding_save() and crew_rehire_save(). Only a new row (RETURNING xmax = 0) opens a draft crew_contracts row (unless one is draft or active for the person on the vessel or for no vessel; contract_type from contract_type_key when crew_contracts allows it, else rotational) and, when planner_period_write exists, an On board period from the joining day, end unknown (skipped when a confirmed period runs on or after that day). Never on the update path. The caller gates. Returns the terms row, inserted, contract_id and period_id (NULL when not opened).';
 COMMENT ON FUNCTION public.crew_find_duplicates(uuid, text, text, text, date) IS 'Possible duplicates before Add Crew saves (gap/04 W1): people of the caller''s company with the same email, or the same name (and date of birth when both are known), with the vessel they are on. Gate: vessel.crew.crew_profiles.create on the vessel, no external viewer.';
 COMMENT ON FUNCTION public.crew_personal_details_scope_guard() IS 'Trigger crew_personal_details_scope_guard (every writer): the row names a person of its own company (23514 crew_profile_scope_mismatch).';
 COMMENT ON FUNCTION public.crew_languages_scope_guard() IS 'Trigger crew_languages_scope_guard (every writer): the row names a person of its own company (23514 crew_profile_scope_mismatch).';

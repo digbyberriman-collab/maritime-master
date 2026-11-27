@@ -574,27 +574,83 @@ SELECT tests.is_empty(format($q$SELECT * FROM public.fleet_document_my_pending()
 SELECT tests.as_user(tests.user_id('A.fleet_manager'));
 SELECT tests.throws_like(format($q$SELECT public.fleet_document_remind(%L)$q$, pg_temp.id('doc:all')), '22023', 'not_published', 'withdrawn: no reminders');
 
--- ------------------------------------------------------------ files: the storage read hook (PR-07)
+-- ------------------------------------------------------------ files: the storage read hook (PR-07, D-382)
 
+-- A new draft version of the published manual (the next revision, not
+-- published yet), and every version file as a storage object.
 SELECT tests.reset_role();
+INSERT INTO ids SELECT 'file:manual_next', pg_temp.file_for(pg_temp.id('doc:manual'), 'manual-next-revision');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+INSERT INTO ids SELECT 'ver:manual_next', (public.fleet_document_add_version(pg_temp.id('doc:manual'), pg_temp.id('file:manual_next'))).id;
+SELECT tests.reset_role();
+SELECT tests.is((SELECT state FROM public.fleet_document_versions WHERE id = pg_temp.id('ver:manual_next')), 'draft', 'files: the manual has a draft next to its published version');
+INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+SELECT 'records', v.storage_path, NULL, '{"size": 2048, "mimetype": "application/pdf"}'::jsonb
+FROM public.fleet_document_versions AS v WHERE v.document_id IN (pg_temp.id('doc:manual'), pg_temp.id('doc:draft'));
 SELECT v.storage_path AS manual_path FROM public.fleet_document_versions AS v WHERE v.id = pg_temp.id('ver:manual3') \gset
+SELECT v.storage_path AS manual_old_path FROM public.fleet_document_versions AS v WHERE v.id = pg_temp.id('ver:manual1') \gset
+SELECT v.storage_path AS manual_draft_path FROM public.fleet_document_versions AS v WHERE v.id = pg_temp.id('ver:manual_next') \gset
 SELECT v.storage_path AS draft_path FROM public.fleet_document_versions AS v WHERE v.document_id = pg_temp.id('doc:draft') \gset
-SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.deck1'), pg_temp.id('doc:manual')), 'files: DRAAK crew read a document published to DRAAK');
-SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.crew_gam'), pg_temp.id('doc:manual')) IS FALSE, 'files: GAME CHANGER crew do not (not targeted)');
-SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.deck1'), pg_temp.id('doc:draft')) IS FALSE, 'files: crew never read a draft');
-SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.fleet_manager'), pg_temp.id('doc:draft')), 'files: an editor reads a draft');
-SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.doc_viewer'), pg_temp.id('doc:draft')) IS FALSE
-                AND public.fleet_document_file_readable(tests.user_id('A.doc_viewer'), pg_temp.id('doc:all')), 'files: a viewer reads non-drafts (a withdrawn one too), not drafts');
-SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.susp'), pg_temp.id('doc:manual')) IS FALSE, 'files: a suspended login reads nothing');
-SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('B.admin'), pg_temp.id('doc:manual')) IS FALSE, 'files: company B reads nothing');
-SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.deck1'), gen_random_uuid()) IS FALSE AND public.fleet_document_file_readable(NULL, pg_temp.id('doc:manual')) IS FALSE,
-                'files: unknown ids answer false');
+SELECT tests.is((SELECT count(*) FROM public.fleet_document_versions WHERE document_id = pg_temp.id('doc:manual') AND state = 'superseded'), 2::bigint,
+                'files: the manual has two superseded versions');
+CREATE TEMP TABLE manual_paths ON COMMIT DROP AS
+  SELECT v.storage_path AS path, v.state FROM public.fleet_document_versions AS v WHERE v.document_id = pg_temp.id('doc:manual');
+GRANT SELECT ON manual_paths TO PUBLIC;
+
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.deck1'), pg_temp.id('doc:manual'), :'manual_path'), 'files: DRAAK crew read the published version''s file');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.deck1'), pg_temp.id('doc:manual'), :'manual_draft_path') IS FALSE,
+                'files: but not the draft of the next revision');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.deck1'), pg_temp.id('doc:manual'), :'manual_old_path') IS FALSE,
+                'files: nor a superseded version''s file');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.crew_gam'), pg_temp.id('doc:manual'), :'manual_path') IS FALSE, 'files: GAME CHANGER crew do not (not targeted)');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.deck1'), pg_temp.id('doc:draft'), :'draft_path') IS FALSE, 'files: crew never read a draft document');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.fleet_manager'), pg_temp.id('doc:draft'), :'draft_path')
+                AND public.fleet_document_file_readable(tests.user_id('A.fleet_manager'), pg_temp.id('doc:manual'), :'manual_draft_path')
+                AND public.fleet_document_file_readable(tests.user_id('A.fleet_manager'), pg_temp.id('doc:manual'), :'manual_old_path'),
+                'files: an editor reads every file (drafts and superseded versions)');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.doc_viewer'), pg_temp.id('doc:manual'), :'manual_path')
+                AND public.fleet_document_file_readable(tests.user_id('A.doc_viewer'), pg_temp.id('doc:manual'), :'manual_old_path')
+                AND public.fleet_document_file_readable(tests.user_id('A.doc_viewer'), pg_temp.id('doc:manual'), :'manual_draft_path') IS FALSE
+                AND public.fleet_document_file_readable(tests.user_id('A.doc_viewer'), pg_temp.id('doc:draft'), :'draft_path') IS FALSE,
+                'files: a library reader reads the versions that are not drafts (superseded too), never a draft');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.deck1'), pg_temp.id('doc:manual'), replace(:'manual_path', '/fleet/', '/' || tests.vessel_id('A.dra')::text || '/')) IS FALSE,
+                'files: a name that is no version''s file is refused, even by the document''s readers');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.susp'), pg_temp.id('doc:manual'), :'manual_path') IS FALSE, 'files: a suspended login reads nothing');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('B.admin'), pg_temp.id('doc:manual'), :'manual_path') IS FALSE, 'files: company B reads nothing');
+SELECT tests.ok(public.fleet_document_file_readable(tests.user_id('A.deck1'), gen_random_uuid(), :'manual_path') IS FALSE
+                AND public.fleet_document_file_readable(NULL, pg_temp.id('doc:manual'), :'manual_path') IS FALSE
+                AND public.fleet_document_file_readable(tests.user_id('A.deck1'), pg_temp.id('doc:manual'), NULL) IS FALSE,
+                'files: unknown ids and a NULL name answer false');
+SELECT tests.ok(to_regprocedure('public.fleet_document_file_readable(uuid,uuid)') IS NULL, 'files: the per-document form is gone');
+
 SELECT tests.as_user(tests.user_id('A.deck1'));
 SELECT tests.ok(public.storage_path_allowed('records', :'manual_path', false), 'files: through storage_path_allowed, DRAAK crew open the published file');
-SELECT tests.ok(NOT public.storage_path_allowed('records', :'draft_path', false), 'files: and never the draft''s');
+SELECT tests.ok(NOT public.storage_path_allowed('records', :'manual_draft_path', false) AND NOT public.storage_path_allowed('records', :'manual_old_path', false),
+                'files: and never the manual''s draft or superseded files');
+SELECT tests.ok(NOT public.storage_path_allowed('records', :'draft_path', false), 'files: nor a draft document''s file');
 SELECT tests.ok(NOT public.storage_path_allowed('records', :'manual_path', true), 'files: reading never grants writing');
+SELECT tests.ok(NOT public.storage_path_allowed('records', replace(:'manual_path', '/fleet/', '/' || tests.vessel_id('A.gam')::text || '/'), false)
+                AND NOT public.storage_path_allowed('records', replace(:'manual_path', '/fleet/', '/' || tests.vessel_id('A.dra')::text || '/'), false),
+                'files: the vessel-folder variant of the published file is refused (scope fleet)');
+SELECT tests.results_eq(
+  format($q$SELECT o.name FROM storage.objects AS o WHERE o.bucket_id = 'records' AND o.name LIKE %L ORDER BY 1$q$,
+         tests.company_id('A')::text || '/fleet/documents/fleet_document/' || pg_temp.id('doc:manual')::text || '/%'),
+  format($q$VALUES (%L::text)$q$, :'manual_path'),
+  'files: listing the document''s folder (storage prefix SELECT), crew see the published file only');
+SELECT tests.as_user(tests.user_id('A.doc_viewer'));
+SELECT tests.results_eq(
+  format($q$SELECT o.name FROM storage.objects AS o WHERE o.bucket_id = 'records' AND o.name LIKE %L ORDER BY 1$q$,
+         tests.company_id('A')::text || '/fleet/documents/fleet_document/' || pg_temp.id('doc:manual')::text || '/%'),
+  $q$SELECT path FROM manual_paths WHERE state <> 'draft' ORDER BY 1$q$,
+  'files: a library reader with fleet reach lists the published and superseded files, not the draft');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.is((SELECT count(*) FROM storage.objects AS o WHERE o.bucket_id = 'records'
+                 AND o.name LIKE tests.company_id('A')::text || '/fleet/documents/fleet_document/' || pg_temp.id('doc:manual')::text || '/%'),
+                (SELECT count(*) FROM manual_paths), 'files: an editor lists every file of the document');
 SELECT tests.as_user(tests.user_id('A.crew_gam'));
 SELECT tests.ok(NOT public.storage_path_allowed('records', :'manual_path', false), 'files: untargeted crew cannot open it');
+SELECT tests.is((SELECT count(*) FROM storage.objects AS o WHERE o.bucket_id = 'records' AND o.name LIKE '%' || pg_temp.id('doc:manual')::text || '%'), 0::bigint,
+                'files: and list nothing of it');
 SELECT tests.reset_role();
 
 -- ------------------------------------------------------------ direct writes are refused for every role
@@ -631,12 +687,12 @@ SELECT tests.ok(
   'grants: the browser RPCs and the RLS helper are executable by authenticated, not anon');
 SELECT tests.ok(
   (SELECT bool_and(NOT has_function_privilege('authenticated', f, 'EXECUTE') AND NOT has_function_privilege('anon', f, 'EXECUTE'))
-   FROM unnest(ARRAY['public.fleet_document_ack_rows(uuid,uuid,uuid[],timestamptz)', 'public.fleet_document_file_readable(uuid,uuid)',
+   FROM unnest(ARRAY['public.fleet_document_ack_rows(uuid,uuid,uuid[],timestamptz)', 'public.fleet_document_file_readable(uuid,uuid,text)',
                      'public.fleet_document_in_signer_set(uuid,uuid,uuid,uuid,text,text)', 'public.fleet_document_is_senior(uuid,uuid,uuid,text,text)',
                      'public.fleet_document_vessel_pairs(uuid,uuid,uuid[])', 'public.fleet_document_ack_state(text,boolean,boolean,boolean,boolean,boolean,timestamptz,timestamptz)',
                      'public.fleet_documents_after_publish()', 'public.fleet_document_acknowledgements_guard()']::regprocedure[]) AS f),
   'grants: the state core, the file predicate, the helpers and the triggers are internal');
-SELECT tests.ok(has_function_privilege('service_role', 'public.fleet_document_file_readable(uuid,uuid)', 'EXECUTE'), 'grants: the file predicate is the service''s');
+SELECT tests.ok(has_function_privilege('service_role', 'public.fleet_document_file_readable(uuid,uuid,text)', 'EXECUTE'), 'grants: the file predicate is the service''s');
 SELECT tests.ok((SELECT bool_and(c.relrowsecurity) FROM pg_class AS c WHERE c.oid IN ('public.fleet_document_acknowledgements'::regclass, 'public.fleet_document_signer_rules'::regclass, 'public.fleet_document_reminders'::regclass)),
                 'grants: RLS is on for the three tables');
 SELECT tests.ok(NOT has_table_privilege('authenticated', 'public.fleet_document_acknowledgements', 'INSERT')

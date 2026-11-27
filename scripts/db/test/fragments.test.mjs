@@ -4,7 +4,8 @@
 // inactive-gate probes merge in file-name order; a name two files claim is
 // an error; the CLI prints the merged JSON or exits 1 with nothing on stdout;
 // the contract checker runs its stale checks on fragment entries and names
-// the fragment; the repo's own seeded fragments merge cleanly.
+// the fragment; the repo's own fragments merge cleanly (wave 1 folded the
+// contract-map and function-grants fragments back, D-359).
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -239,11 +240,13 @@ test('probes: probe and allow entries concatenate with their source; a callee tw
 
 // ---------------------------------------------------------------- the repo's own fragments
 
-test('the repo: crew and fleet fragments exist and merge cleanly (streams fill them; the integrator folds them back)', () => {
-  for (const dir of ['scripts/db/contract-map.d', 'supabase/tests/fixtures/function-grants.d', 'supabase/tests/fixtures/inactive-probes.d']) {
-    const names = readFragments(dir, { root: REPO }).map((f) => f.file.split('/').pop());
-    assert.ok(names.includes('crew.json') && names.includes('fleet.json'), `${dir} has crew.json and fleet.json`);
+test('the repo: fragments merge cleanly (wave 1 folded contract-map.d and function-grants.d; inactive-probes.d keeps the module probes)', () => {
+  // contract-map.d and function-grants.d may be absent or hold the next wave's fragments; whatever is there must merge.
+  for (const dir of ['scripts/db/contract-map.d', 'supabase/tests/fixtures/function-grants.d']) {
+    for (const f of readFragments(dir, { root: REPO })) assert.match(f.file, /\.json$/);
   }
+  const probes = readFragments('supabase/tests/fixtures/inactive-probes.d', { root: REPO }).map((f) => f.file.split('/').pop());
+  assert.ok(probes.includes('crew.json') && probes.includes('fleet.json'), 'inactive-probes.d keeps crew.json and fleet.json (D-359)');
   assert.doesNotThrow(() => loadContractMap({ root: REPO }));
   assert.doesNotThrow(() => loadGrants({ root: REPO }));
   assert.doesNotThrow(() => loadProbes({ root: REPO }));

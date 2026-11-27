@@ -83,7 +83,7 @@ const CASES: Case[] = [
   c('vaccine not required expired', { vaccineOverdue: 1 }, ['vaccine_overdue'], 'at_risk'),
   c('rest non-compliance', { restNoncompliant: 2 }, ['rest_noncompliance'], 'at_risk'),
   c('health check overdue', { occHealth: 'overdue' }, ['occ_health_overdue'], 'at_risk'),
-  c('no health record', { hasHealthRecord: false, eng1State: 'missing', requiredExpired: null, requiredMissing: null, vaccineOverdue: null, boostersDue: null, vaccinationRecords: null, occHealth: null }, ['no_health_record'], 'incomplete'),
+  c('no health record', { hasHealthRecord: false, eng1State: 'missing', requiredExpired: null, requiredMissing: null, vaccineOverdue: null, boostersDue: null, vaccinationRecords: null, occHealth: null }, ['eng1_missing', 'no_health_record'], 'critical'),
   c('no health record with an expired eng1 document', { hasHealthRecord: false, eng1State: 'expired', requiredExpired: null, requiredMissing: null, vaccineOverdue: null, boostersDue: null, vaccinationRecords: null, occHealth: null }, ['eng1_expired', 'no_health_record'], 'critical'),
   c('no health record, rest breach', { hasHealthRecord: false, eng1State: 'valid', requiredExpired: null, requiredMissing: null, vaccineOverdue: null, boostersDue: null, vaccinationRecords: null, occHealth: null, restNoncompliant: 1 }, ['rest_noncompliance', 'no_health_record'], 'at_risk'),
   c('eng1 without expiry', { eng1State: 'no_expiry' }, ['eng1_no_expiry'], 'incomplete'),
@@ -234,9 +234,10 @@ describe('every combination of the facts', () => {
     if (ranks.some((r, i) => i > 0 && r < ranks[i - 1])) out.push('severity order');
     // The status is the most severe level, and ok only without reasons.
     if (MEDICAL_STATUS_RANK[status] !== (ranks.length ? Math.min(...ranks) : MEDICAL_STATUS_RANK.ok)) out.push('status');
-    // One ENG1 reason at most; none for a missing ENG1 without a Health record.
+    // One ENG1 reason at most; a missing ENG1 is critical with or without a Health record (D-385).
     if (reasons.filter((r) => r.startsWith('eng1_')).length > 1) out.push('one eng1 reason');
-    if (!f.hasHealthRecord && (!reasons.includes('no_health_record') || reasons.some((r) => ['eng1_missing', 'no_vaccinations', 'no_occ_health'].includes(r)))) {
+    if (f.eng1State === 'missing' && !reasons.includes('eng1_missing')) out.push('missing eng1');
+    if (!f.hasHealthRecord && (!reasons.includes('no_health_record') || reasons.some((r) => ['no_vaccinations', 'no_occ_health'].includes(r)))) {
       out.push('no health record');
     }
     // A serious breach is listed instead of plain non-compliance; unknown rest raises nothing.
@@ -244,7 +245,7 @@ describe('every combination of the facts', () => {
     if (f.seriousRest === null && f.restNoncompliant === null && reasons.some((r) => r.includes('rest'))) out.push('untracked rest');
     // Critical exactly when a W8 critical rule holds.
     const critical =
-      (f.eng1State === 'missing' && f.hasHealthRecord) ||
+      f.eng1State === 'missing' ||
       f.eng1State === 'unfit' ||
       f.eng1State === 'expired' ||
       (f.requiredExpired ?? 0) > 0 ||

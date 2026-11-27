@@ -30,11 +30,14 @@ import {
   makeAddCrewSchema,
   parseLeaveDays,
   parseRatioPart,
+  REHIRE_MISSING_MESSAGE,
+  rehireFailure,
   rehireResult,
   toCreateCrewInput,
   toOnboardingTerms,
   type AddCrewValues,
   type OnboardingOutcome,
+  type RehireOutcome,
 } from '@/modules/crew/lib/addCrewSchema';
 import { CREW_MEMBER_ROLES, NOT_STORED_NOTE, type CreateCrewOutcome, type EdgeFailure } from '@/modules/auth/services/adminActions';
 import { CREW_ROUTES } from '@/modules/crew/routes';
@@ -359,10 +362,51 @@ describe('the outcome (non-negotiable 9)', () => {
   });
 });
 
-describe('a re-hire saves the terms only', () => {
-  it('saved, missing and refused', () => {
-    expect(rehireResult(SAVED, 'p-old')).toMatchObject({ kind: 'added', tone: 'success', title: 'Employment saved', profileId: 'p-old' });
-    expect(rehireResult(MISSING, 'p-old')).toMatchObject({ kind: 'not_added', retry: false });
-    expect(rehireResult(REFUSED, 'p-old')).toMatchObject({ kind: 'not_added', retry: true, message: 'This person is not on this vessel’s crew.' });
+describe('the re-hire outcome (crew_rehire_save, D-374)', () => {
+  const REHIRED: RehireOutcome = { status: 'saved', assignmentId: 'a-new', contractId: 'c-draft', periodId: 'fp-1' };
+
+  it('saved: names the assignment, and the draft contract and the On board period when returned', () => {
+    const r = rehireResult(REHIRED, 'p-old');
+    expect(r).toMatchObject({ kind: 'added', tone: 'success', title: 'Re-hired', profileId: 'p-old', invited: false, employmentSaved: true });
+    expect(r.kind === 'added' && r.lines).toEqual([
+      "They are on this vessel's crew again from the start date, with their new employment details.",
+      'A draft contract is open for them. Complete it from Employment on the profile.',
+      'The planner shows them On board from the day they join.',
+    ]);
+    const bare = rehireResult({ status: 'saved', assignmentId: 'a-new', contractId: null, periodId: null }, 'p-old');
+    expect(bare.kind === 'added' && bare.lines).toEqual(["They are on this vessel's crew again from the start date, with their new employment details."]);
+  });
+
+  it('missing (D-01): not re-hired, never a fake success, no retry', () => {
+    expect(rehireResult({ status: 'missing' }, 'p-old')).toEqual({
+      kind: 'not_added',
+      tone: 'error',
+      title: 'The crew member was not re-hired',
+      message: REHIRE_MISSING_MESSAGE,
+      field: null,
+      retry: false,
+    });
+    expect(REHIRE_MISSING_MESSAGE).toBe('Re-hire is not available yet: the crew update is not applied.');
+  });
+
+  it('refusals carry the DETAIL sentence and no retry; other failures retry', () => {
+    const fallback = "You don't have permission to do that.";
+    const cases: [unknown, string, boolean][] = [
+      [{ code: '22023', message: 'on_crew_now', details: 'This person is on a crew today. Transfer them instead.' }, 'This person is on a crew today. Transfer them instead.', false],
+      [{ code: '22023', message: 'transfer_open', details: 'This person has a transfer in progress. Open it from their profile.' }, 'This person has a transfer in progress. Open it from their profile.', false],
+      [{ code: 'P0002', message: 'person_not_found', details: 'This crew member could not be found.' }, 'This crew member could not be found.', false],
+      [{ code: '0A000', message: 'rehire_no_login', details: 'Re-hiring someone without a sign-in is not available yet. Invite them first, or add them again as a new crew member.' },
+        'Re-hiring someone without a sign-in is not available yet. Invite them first, or add them again as a new crew member.', false],
+      [{ code: '42501', message: 'master_rehire_refused', details: 'Only a users-access administrator of this vessel can re-hire a Master.' }, 'Only a users-access administrator of this vessel can re-hire a Master.', false],
+      [{ code: '42501', message: 'crew_not_permitted' }, fallback, false],
+      [{ code: '08006', message: 'connection failure' }, fallback, true],
+    ];
+    for (const [error, message, retry] of cases) {
+      const outcome = rehireFailure(error, fallback);
+      expect(outcome).toEqual({ status: 'failed', message, retry });
+      const r = rehireResult(outcome, 'p-old');
+      expect(r).toMatchObject({ kind: 'not_added', title: 'The crew member was not re-hired', field: null, retry });
+      expect(r.kind === 'not_added' && r.message.endsWith('.')).toBe(true);
+    }
   });
 });

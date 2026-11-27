@@ -58,7 +58,7 @@ INSERT INTO reasons_case VALUES
   ('vaccine not required expired', true, 'valid', 0, 0, 1, 0, 2, 0, 0, 'ok', 'vaccine_overdue', 'at_risk'),
   ('rest non-compliance', true, 'valid', 0, 0, 0, 0, 2, 0, 2, 'ok', 'rest_noncompliance', 'at_risk'),
   ('health check overdue', true, 'valid', 0, 0, 0, 0, 2, 0, 0, 'overdue', 'occ_health_overdue', 'at_risk'),
-  ('no health record', false, 'missing', NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, 'no_health_record', 'incomplete'),
+  ('no health record', false, 'missing', NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, 'eng1_missing|no_health_record', 'critical'),
   ('no health record with an expired eng1 document', false, 'expired', NULL, NULL, NULL, NULL, NULL, 0, 0, NULL, 'eng1_expired|no_health_record', 'critical'),
   ('no health record, rest breach', false, 'valid', NULL, NULL, NULL, NULL, NULL, 0, 1, NULL, 'rest_noncompliance|no_health_record', 'at_risk'),
   ('eng1 without expiry', true, 'no_expiry', 0, 0, 0, 0, 2, 0, 0, 'ok', 'eng1_no_expiry', 'incomplete'),
@@ -215,6 +215,7 @@ FROM (VALUES
   ('serious', 'A.m_serious', 'rolling_24h', 2, 200, false, 600),   -- < 4 h in 24 h
   ('legacy', 'A.m_legacy', 'rolling_7d', 4, 2900, false, 4200),    -- < 50 h in 7 days (legacy rule only)
   ('ok_pass', 'A.m_ok', 'rolling_24h', 1, 800, true, 600),         -- rested
+  ('ok_dismissed', 'A.m_ok', 'rolling_24h', 5, 500, false, 600),   -- a failing check whose breach X1's review dismissed (D-380)
   ('gam', 'A.m_gam', 'rolling_24h', 2, 200, false, 600)            -- Hours of Rest off on GAME CHANGER
 ) AS x(k, crew, win, d, rest, passes, thr);
 
@@ -273,7 +274,23 @@ INSERT INTO public.work_rest_non_conformities (id, crew_id, rule_code, rule_desc
    tests.vessel_id('A.dra'), current_date - 3, true, now(), NULL),
   (tests.id('nc:legacy'), tests.user_id('A.m_legacy'), 'REST_7D_MIN', 'Rest below the minimum in 7 days', 'high',
    ((current_date - 10)::timestamp AT TIME ZONE 'UTC'), ((current_date - 3)::timestamp AT TIME ZONE 'UTC'), 48.3, 77, 'open',
-   tests.vessel_id('A.dra'), current_date - 4, false, NULL, NULL);
+   tests.vessel_id('A.dra'), current_date - 4, false, NULL, NULL),
+  -- D-380: breach days come from X1's breach review. A.m_restnc: the live
+  -- (not serious) breach of its failing-check day, a periods-only breach
+  -- with no failing check, and a 40-day-old one outside the window.
+  (tests.id('nc:restnc'), tests.user_id('A.m_restnc'), 'REST_24H_MIN', 'Rest below the minimum in 24 hours', 'high',
+   ((current_date - 3)::timestamp AT TIME ZONE 'UTC'), ((current_date - 2)::timestamp AT TIME ZONE 'UTC'), 8.3, 10, 'open',
+   tests.vessel_id('A.dra'), current_date - 3, false, NULL, NULL),
+  (tests.id('nc:restnc_periods'), tests.user_id('A.m_restnc'), 'REST_PERIODS_MAX', 'Rest in more than two periods', 'medium',
+   ((current_date - 7)::timestamp AT TIME ZONE 'UTC'), ((current_date - 6)::timestamp AT TIME ZONE 'UTC'), 3, 2, 'open',
+   tests.vessel_id('A.dra'), current_date - 7, false, NULL, NULL),
+  (tests.id('nc:restnc_old'), tests.user_id('A.m_restnc'), 'REST_24H_MIN', 'Rest below the minimum in 24 hours', 'high',
+   ((current_date - 40)::timestamp AT TIME ZONE 'UTC'), ((current_date - 39)::timestamp AT TIME ZONE 'UTC'), 1.7, 10, 'open',
+   tests.vessel_id('A.dra'), current_date - 40, false, NULL, NULL),
+  -- A.m_ok: the failing check's breach was dismissed in X1's review.
+  (tests.id('nc:ok_dismissed'), tests.user_id('A.m_ok'), 'REST_24H_MIN', 'Rest below the minimum in 24 hours', 'high',
+   ((current_date - 5)::timestamp AT TIME ZONE 'UTC'), ((current_date - 4)::timestamp AT TIME ZONE 'UTC'), 8.3, 10, 'dismissed',
+   tests.vessel_id('A.dra'), current_date - 5, false, NULL, 'dismissed');
 
 -- ------------------------------------------------------------ snapshots
 
@@ -330,7 +347,7 @@ INSERT INTO want VALUES
   ('A.m_legacy', 'at_risk', 'rest_noncompliance'),
   ('A.m_flags', 'ok', ''),
   ('A.m_flagsok', 'ok', ''),
-  ('A.m_nohealth', 'incomplete', 'no_health_record'),
+  ('A.m_nohealth', 'critical', 'eng1_missing|no_health_record'),
   ('A.m_doc', 'ok', ''),
   ('A.m_doc_eng1', 'ok', ''),
   ('A.m_two', 'ok', ''),
@@ -374,7 +391,10 @@ SELECT tests.is(pg_temp.row_of('defaults', 'A.m_vmiss') -> 'vaccines_missing', '
 SELECT tests.is(pg_temp.row_of('defaults', 'A.m_novac') -> 'vaccines_valid', '0'::jsonb, 'vaccines: none recorded');
 
 -- Rest.
-SELECT tests.is(pg_temp.row_of('defaults', 'A.m_restnc') -> 'rest_noncompliant_30d', '1'::jsonb, 'rest: one breach day in 30 days (the 40-day-old one is out)');
+SELECT tests.is(pg_temp.row_of('defaults', 'A.m_restnc') -> 'rest_noncompliant_30d', '2'::jsonb,
+                'rest: two breach days in 30 days from X1''s breach review: the failing-check day and a periods-only day (no failing check); the 40-day-old one is out (D-380)');
+SELECT tests.is(pg_temp.row_of('defaults', 'A.m_ok') -> 'rest_noncompliant_30d', '0'::jsonb,
+                'rest: a breach X1''s review dismissed counts 0, though its failing check is still there (D-380)');
 SELECT tests.is(pg_temp.row_of('defaults', 'A.m_restnc') -> 'serious_rest_breach_30d', '0'::jsonb, 'rest: a superseded serious breach does not count');
 SELECT tests.is(pg_temp.row_of('defaults', 'A.m_serious') -> 'serious_rest_breach_30d', '1'::jsonb, 'X1 branch present: X1''s serious flag decides');
 SELECT tests.is(pg_temp.row_of('defaults', 'A.m_legacy') -> 'serious_rest_breach_30d', '0'::jsonb, 'X1 branch present: a 7-day breach X1 does not flag is not serious');
@@ -395,6 +415,18 @@ SELECT tests.ok(NOT (pg_temp.row_of('defaults', 'A.m_nohealth') ->> 'has_health_
                 AND pg_temp.row_of('defaults', 'A.m_nohealth') -> 'occ_health_state' = 'null'::jsonb
                 AND pg_temp.row_of('defaults', 'A.m_nohealth') -> 'condition_flag' = 'null'::jsonb,
                 'no Health record: nothing health-side is guessed');
+-- No ENG1 and no Health subject record (the hw_people row deleted): the
+-- missing ENG1 is critical all the same (gap/02 W8, D-385), so the person
+-- is listed under the Critical filter, most severe first.
+SELECT tests.ok(pg_temp.row_of('defaults', 'A.m_nohealth') ->> 'eng1_state' = 'missing'
+                AND pg_temp.row_of('defaults', 'A.m_nohealth') ->> 'status' = 'critical',
+                'no Health record: a missing ENG1 is critical');
+SELECT pg_temp.take('critical_only', 'A.fleet_manager', NULL, ARRAY['critical']);
+SELECT tests.ok(pg_temp.row_of('critical_only', 'A.m_nohealth') IS NOT NULL
+                AND pg_temp.reasons_of('critical_only', 'A.m_nohealth') = 'eng1_missing|no_health_record',
+                'no Health record: the person appears under p_status => critical');
+SELECT tests.is((SELECT count(*) FROM snap WHERE label = 'critical_only' AND r ->> 'status' <> 'critical'), 0::bigint,
+                'the Critical filter returns critical rows only');
 SELECT tests.ok((pg_temp.row_of('defaults', 'A.m_planned') ->> 'is_planned')::boolean
                 AND pg_temp.row_of('defaults', 'A.m_planned') ->> 'join_date' = (current_date + 10)::text
                 AND pg_temp.row_of('defaults', 'A.m_planned') ->> 'department' = 'Engineering',
@@ -545,7 +577,7 @@ SELECT tests.is(pg_temp.reasons_of('settings', 'A.m_vreq'), 'required_vaccine_ex
 SELECT tests.is(pg_temp.reasons_of('settings', 'A.m_vmiss'), 'required_vaccine_missing', 'required list: no yellow fever on file is a required vaccine missing');
 SELECT tests.is(pg_temp.row_of('settings', 'A.m_vmiss') -> 'vaccines_missing', '1'::jsonb, 'required list: one missing');
 SELECT tests.is(pg_temp.row_of('settings', 'A.m_vexempt') ->> 'status', 'ok', 'required list: an exemption satisfies it');
-SELECT tests.is(pg_temp.reasons_of('settings', 'A.m_nohealth'), 'no_health_record', 'required list: not judged without a Health record');
+SELECT tests.is(pg_temp.reasons_of('settings', 'A.m_nohealth'), 'eng1_missing|no_health_record', 'required list: not judged without a Health record (the missing ENG1 still is, D-385)');
 SELECT tests.is(pg_temp.reasons_of('settings', 'A.m_novac'), 'required_vaccine_missing|no_vaccinations', 'required list: with no vaccination at all, both');
 
 -- ------------------------------------------------------------ windows from expiry_window_rules (C5)

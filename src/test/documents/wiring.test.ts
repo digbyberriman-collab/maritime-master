@@ -396,10 +396,13 @@ describe('acknowledgements (X5-05A)', () => {
     expect(statusMeta('document_ack', 'acknowledged').tone).toBe('ok');
   });
 
-  it('040400 defines the storage read-hook predicate with the exact signature the hook names (PR-07)', () => {
-    expect(ACK_SQL).toMatch(/CREATE OR REPLACE FUNCTION public\.fleet_document_file_readable\(p_user_id uuid, p_document_id uuid\)\s+RETURNS boolean/);
-    expect(ACK_SQL).toMatch(/GRANT EXECUTE ON FUNCTION public\.fleet_document_file_readable\(uuid, uuid\) TO service_role;/);
-    expect(ACK_SQL).not.toMatch(/GRANT EXECUTE ON FUNCTION public\.fleet_document_file_readable\(uuid, uuid\) TO authenticated/);
+  it('040400 defines the storage read-hook predicate with the exact signature the hook names (PR-07, per file since D-382)', () => {
+    expect(ACK_SQL).toMatch(/CREATE OR REPLACE FUNCTION public\.fleet_document_file_readable\(p_user_id uuid, p_document_id uuid, p_name text\)\s+RETURNS boolean/);
+    expect(ACK_SQL).toMatch(/DROP FUNCTION IF EXISTS public\.fleet_document_file_readable\(uuid, uuid\);/);
+    expect(ACK_SQL).toMatch(/GRANT EXECUTE ON FUNCTION public\.fleet_document_file_readable\(uuid, uuid, text\) TO service_role;/);
+    expect(ACK_SQL).not.toMatch(/GRANT EXECUTE ON FUNCTION public\.fleet_document_file_readable\([^)]*\) TO authenticated/);
+    const HOOKS_SQL = read('supabase/migrations/20261123020300_platform_record_files.sql');
+    expect(HOOKS_SQL).toContain("'public.fleet_document_file_readable(uuid,uuid,text)'");
   });
 
   it('every 040400 definer has a search_path, every emit is guarded, and no table has a browser write policy', () => {

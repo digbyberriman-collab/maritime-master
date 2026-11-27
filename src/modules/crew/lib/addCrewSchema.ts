@@ -434,26 +434,57 @@ export function addCrewResult(create: CreateCrewOutcome, onboarding: OnboardingO
   };
 }
 
-/** A re-hire saves the terms only (the person exists): the outcome of that one step. */
-export function rehireResult(onboarding: OnboardingOutcome, profileId: string): AddCrewResult {
-  if (onboarding.status === 'saved') {
-    return {
-      kind: 'added',
-      tone: 'success',
-      title: 'Employment saved',
-      lines: ['Their new employment details on this vessel are saved.'],
-      profileId,
-      invited: false,
-      employmentSaved: true,
-    };
+/** What crew_rehire_save did (D-374): the new assignment, and the draft contract and On board period when it opened them (D-375). */
+export type RehireOutcome =
+  | { status: 'saved'; assignmentId: string; contractId: string | null; periodId: string | null }
+  /** The function is not applied yet (D-01). */
+  | { status: 'missing' }
+  /** Refused or failed; `retry` only when trying again could help (not a refusal). */
+  | { status: 'failed'; message: string; retry: boolean };
+
+/** D-01: the re-hire definer is not in this database yet. Never a fake success. */
+export const REHIRE_MISSING_MESSAGE = 'Re-hire is not available yet: the crew update is not applied.';
+
+/** The SQLSTATEs crew_rehire_save refuses with, each with a DETAIL sentence (42501 gates, 22023 rules, P0002 unknown, 0A000 no login). */
+const REHIRE_REFUSAL_CODES = new Set(['42501', '22023', 'P0002', '0A000']);
+const CODE_LIKE_TEXT = /^[a-z0-9_]+$/;
+
+/**
+ * The sentence and retry flag for a crew_rehire_save error: a refusal's
+ * DETAIL is the sentence (on_crew_now, transfer_open, rehire_no_login,
+ * master_rehire_refused, out_of_reach, field rules ...), never retried;
+ * otherwise the crew refusal sentence (`fallback`, crewRefusalMessage),
+ * retried.
+ */
+export function rehireFailure(error: unknown, fallback: string): Extract<RehireOutcome, { status: 'failed' }> {
+  if (error !== null && typeof error === 'object') {
+    const { code, details } = error as { code?: unknown; details?: unknown };
+    const detail = typeof details === 'string' ? details.trim() : '';
+    if (typeof code === 'string' && REHIRE_REFUSAL_CODES.has(code)) {
+      return { status: 'failed', message: detail && !CODE_LIKE_TEXT.test(detail) ? detail : fallback, retry: false };
+    }
   }
-  const why = onboarding.status === 'missing' ? ONBOARDING_MISSING_SENTENCE : stripStop(onboarding.message);
+  return { status: 'failed', message: fallback, retry: true };
+}
+
+/** The re-hire outcome: one definer wrote the assignment, the terms and (when new) the draft contract and the On board period, or nothing. */
+export function rehireResult(outcome: RehireOutcome, profileId: string): AddCrewResult {
+  if (outcome.status === 'saved') {
+    const lines = ['They are on this vessel\'s crew again from the start date, with their new employment details.'];
+    if (outcome.contractId) lines.push('A draft contract is open for them. Complete it from Employment on the profile.');
+    if (outcome.periodId) lines.push('The planner shows them On board from the day they join.');
+    return { kind: 'added', tone: 'success', title: 'Re-hired', lines, profileId, invited: false, employmentSaved: true };
+  }
+  if (outcome.status === 'missing') {
+    return { kind: 'not_added', tone: 'error', title: 'The crew member was not re-hired', message: REHIRE_MISSING_MESSAGE, field: null, retry: false };
+  }
+  const why = stripStop(outcome.message) || 'the server refused it';
   return {
     kind: 'not_added',
     tone: 'error',
-    title: 'The employment details were not saved',
+    title: 'The crew member was not re-hired',
     message: `${why.charAt(0).toUpperCase()}${why.slice(1)}.`,
     field: null,
-    retry: onboarding.status === 'failed',
+    retry: outcome.retry,
   };
 }

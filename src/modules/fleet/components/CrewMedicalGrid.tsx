@@ -164,7 +164,8 @@ function Eng1Cell({ row, today }: { row: CrewMedicalRow; today: string }) {
       pill = <StatusPill tone="danger">{ENG1_STATE_LABELS.unfit}</StatusPill>;
       break;
     case 'missing':
-      pill = row.hasHealthRecord ? <StatusPill tone="danger">{ENG1_STATE_LABELS.missing}</StatusPill> : <StatusPill tone="neutral">Not known</StatusPill>;
+      // A missing ENG1 is critical with or without a Health record (D-385).
+      pill = <StatusPill tone="danger">{ENG1_STATE_LABELS.missing}</StatusPill>;
       break;
     case 'no_expiry':
       pill = <StatusPill tone="info">{ENG1_STATE_LABELS.no_expiry}</StatusPill>;

@@ -8,6 +8,9 @@
  *   company with the same email, or the same name).
  * - useAddCrewSave: create-crew-member (through the adminActions wrapper),
  *   then crew_onboarding_save; the outcome part by part (lib/addCrewSchema).
+ *   A re-hire (the person exists, on no crew) is one crew_rehire_save call
+ *   (D-374): the assignment, the terms, the draft contract and the On board
+ *   period, or nothing; missing -> not added (D-01), never a fake success.
  * - useRehirePrefill: the `?rehire=<profileId>` prefill (X1-11B): names,
  *   email, and the last employment terms' position, department, contract
  *   type and leave allowance.
@@ -24,13 +27,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { pendingClient, type NoPending } from '@/integrations/supabase/pending';
 import { isMissingRelationError } from '@/shared/lib/notify';
 import { createCrewMember } from '@/modules/auth/services/adminActions';
-import type { CrewPendingFunctions, CrewPendingTables, CrewAssignmentTermsRow } from '../types/db.pending';
+import type { CrewPendingFunctions, CrewPendingTables, CrewAssignmentTermsRow, CrewRehireSaveResult } from '../types/db.pending';
 import type { ReferenceList } from './useReferenceData';
 import { crewKeys } from './crewKeys';
 import { isMissingRpc } from '../lib/crewListModel';
 import { crewRefusalMessage } from '../lib/crewUpdateErrors';
 import {
   addCrewResult,
+  rehireFailure,
   rehireResult,
   toCreateCrewInput,
   toOnboardingTerms,
@@ -38,12 +42,14 @@ import {
   type AddCrewValues,
   type DuplicateMatchKind,
   type OnboardingOutcome,
+  type RehireOutcome,
 } from '../lib/addCrewSchema';
 
 const crewDb = pendingClient<CrewPendingTables, NoPending, CrewPendingFunctions>();
 
 export const FIND_DUPLICATES_RPC = 'crew_find_duplicates';
 export const ONBOARDING_SAVE_RPC = 'crew_onboarding_save';
+export const REHIRE_SAVE_RPC = 'crew_rehire_save';
 
 export interface AddCrewVessel {
   id: string;
@@ -179,12 +185,30 @@ export async function saveOnboarding(vesselId: string, profileId: string, values
   return { status: 'saved' };
 }
 
+/** The re-hire (D-374): one definer writes the assignment, the terms linked to it, the draft contract and the On board period. */
+export async function saveRehire(vesselId: string, profileId: string, values: AddCrewValues, context: { positionsFromCatalogue: boolean; departmentsAvailable: boolean }): Promise<RehireOutcome> {
+  const { data, error } = await crewDb.rpc(REHIRE_SAVE_RPC, {
+    p_profile_id: profileId,
+    p_vessel_id: vesselId,
+    p_terms: toOnboardingTerms(values, context),
+  });
+  if (error) {
+    if (isMissingRpc(error, REHIRE_SAVE_RPC)) return { status: 'missing' };
+    return rehireFailure(error, crewRefusalMessage(error));
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as CrewRehireSaveResult | null | undefined;
+  if (!row || typeof row.assignment_id !== 'string' || !row.assignment_id) {
+    return { status: 'failed', message: 'The server did not confirm the re-hire', retry: true };
+  }
+  return { status: 'saved', assignmentId: row.assignment_id, contractId: row.contract_id ?? null, periodId: row.period_id ?? null };
+}
+
 export interface AddCrewSaveContext {
   /** The chosen position's canonical name (D-X1-2), or null for a typed title (D-01). */
   positionName: string | null;
   positionsFromCatalogue: boolean;
   departmentsAvailable: boolean;
-  /** A re-hire: the person exists, so only the terms are saved. */
+  /** A re-hire: the person exists; crew_rehire_save writes the assignment and the terms (D-374). */
   rehireProfileId?: string | null;
 }
 
@@ -195,7 +219,7 @@ export function useAddCrewSave(vessel: AddCrewVessel) {
     mutationFn: async ({ values, context }: { values: AddCrewValues; context: AddCrewSaveContext }): Promise<AddCrewResult> => {
       const terms = { positionsFromCatalogue: context.positionsFromCatalogue, departmentsAvailable: context.departmentsAvailable };
       if (context.rehireProfileId) {
-        return rehireResult(await saveOnboarding(vessel.id, context.rehireProfileId, values, terms), context.rehireProfileId);
+        return rehireResult(await saveRehire(vessel.id, context.rehireProfileId, values, terms), context.rehireProfileId);
       }
       const created = await createCrewMember(toCreateCrewInput(values, { vesselId: vessel.id, positionName: context.positionName }));
       const profileId =

@@ -115,6 +115,36 @@ export const calculateCertificateStatus = (expiryDate: string | null): string =>
   return 'Valid';
 };
 
+type CertificateWrite = 'add' | 'update' | 'delete';
+
+const GENERIC_WRITE_FAILURE: Readonly<Record<CertificateWrite, string>> = {
+  add: 'Failed to add certificate. Please try again.',
+  update: 'Failed to update certificate. Please try again.',
+  delete: 'Failed to delete certificate. Please try again.',
+};
+
+/**
+ * The words for a refused certificate write. The server holds a direct
+ * write to crew_certificates to the same rights as the crew profile's
+ * document steps (42501 crew_not_permitted, D-371): crew add or change their
+ * own documents only while crew uploads are on for their vessel, and remove
+ * only their own upload within 24 hours. Anything else keeps the generic
+ * failure; never a success.
+ */
+export function certificateWriteMessage(error: unknown, action: CertificateWrite): string {
+  const e = (error ?? {}) as { code?: unknown; message?: unknown };
+  if (e.code === '42501' && e.message === 'crew_not_permitted') {
+    if (action === 'delete') return 'Only the person who added this document, within 24 hours, or the HR team can remove it.';
+    return action === 'add'
+      ? 'Crew uploads are off for your vessel. Ask the HR team to add this document.'
+      : 'Crew uploads are off for your vessel. Ask the HR team to change this document.';
+  }
+  if (e.code === '42501' && e.message === 'crew_document_delete_refused') {
+    return 'A reviewed document is kept. Remove it from the crew profile instead.';
+  }
+  return GENERIC_WRITE_FAILURE[action];
+}
+
 export const useCrewCertificates = (userId: string) => {
   const { profile, user } = useAuth();
   const { toast } = useToast();
@@ -199,7 +229,7 @@ export const useCrewCertificates = (userId: string) => {
     onError: (error) => {
       toast({
         title: 'Error',
-        description: 'Failed to add certificate. Please try again.',
+        description: certificateWriteMessage(error, 'add'),
         variant: 'destructive',
       });
       console.error('Error adding certificate:', error);
@@ -274,7 +304,7 @@ export const useCrewCertificates = (userId: string) => {
     onError: (error) => {
       toast({
         title: 'Error',
-        description: 'Failed to update certificate. Please try again.',
+        description: certificateWriteMessage(error, 'update'),
         variant: 'destructive',
       });
       console.error('Error updating certificate:', error);
@@ -324,7 +354,7 @@ export const useCrewCertificates = (userId: string) => {
     onError: (error) => {
       toast({
         title: 'Error',
-        description: 'Failed to delete certificate. Please try again.',
+        description: certificateWriteMessage(error, 'delete'),
         variant: 'destructive',
       });
       console.error('Error deleting certificate:', error);

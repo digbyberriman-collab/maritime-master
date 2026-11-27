@@ -205,6 +205,61 @@ SELECT tests.throws($q$SELECT public.has_capability('vessel.crew.crew_list.view'
 SELECT tests.reset_role();
 SELECT tests.ok(NOT public.has_capability('vessel.crew.crew_list.view', tests.company_id('A'), tests.vessel_id('A.dra')), 'has_capability without a caller is false');
 
+-- ------------------------------------------------------------ the company-wide answer (has_company_capability_for, D-376)
+
+SELECT tests.seed_role('x376_any', 'fleet');
+SELECT tests.seed_role('x376_vessel', 'vessel');
+SELECT tests.seed_role('x376_mixed', 'vessel');
+INSERT INTO public.role_permissions (role_id, module_key, permission, scope)
+SELECT r.id, 'crew_certificates', 'admin', x.sc::public.role_scope_type FROM (VALUES ('x376_any', 'fleet'), ('x376_vessel', 'vessel'), ('x376_mixed', 'fleet')) AS x(n, sc)
+JOIN public.roles AS r ON r.name = x.n;
+SELECT tests.seed_user('A', 'A.cw_unbound', 'crew');
+SELECT tests.seed_assignment('A.cw_unbound', 'A.dra', true, 'Crew');
+SELECT tests.seed_rbac_role('A.cw_unbound', 'x376_any');
+SELECT tests.seed_user('A', 'A.cw_bound', 'crew');
+SELECT tests.seed_assignment('A.cw_bound', 'A.dra', true, 'Crew');
+SELECT tests.seed_rbac_role('A.cw_bound', 'x376_vessel', 'A.dra');
+SELECT tests.seed_user('A', 'A.cw_mixed', 'crew');
+SELECT tests.seed_assignment('A.cw_mixed', 'A.dra', true, 'Crew');
+SELECT tests.seed_rbac_role('A.cw_mixed', 'x376_mixed', 'A.dra');
+-- (An override cannot be bound to a vessel: user_permission_overrides_vessel_unsupported; the core still drops one if it ever is.)
+SELECT tests.seed_user('A', 'A.cw_ovr_any', 'crew');
+SELECT tests.seed_assignment('A.cw_ovr_any', 'A.dra', true, 'Crew');
+INSERT INTO public.user_permission_overrides (user_id, module_key, permission, is_granted, scope, created_by, reason)
+VALUES (tests.user_id('A.cw_ovr_any'), 'crew_certificates', 'admin', true, 'vessel', tests.user_id('A.fleet_manager'), 'Unbound override (D-376 case)');
+SELECT tests.seed_rbac_role('A.disabled', 'x376_any');
+CREATE TEMP TABLE cw_cases (who text, company text, key text, want boolean) ON COMMIT DROP;
+INSERT INTO cw_cases VALUES
+  ('A.cw_unbound', 'A', 'vessel.crew.crew_compliance.admin', true),
+  ('A.cw_bound', 'A', 'vessel.crew.crew_compliance.admin', false),
+  ('A.cw_mixed', 'A', 'vessel.crew.crew_compliance.admin', true),
+  ('A.cw_ovr_any', 'A', 'vessel.crew.crew_compliance.admin', true),
+  ('A.fleet_manager', 'A', 'vessel.crew.crew_compliance.admin', true),
+  ('A.fleet_manager', 'A', 'hris.leave_rotation.leave_requests.approve', true),
+  ('A.disabled', 'A', 'vessel.crew.crew_compliance.admin', false),
+  ('B.admin', 'A', 'vessel.crew.crew_compliance.admin', false),
+  ('A.cw_unbound', 'B', 'vessel.crew.crew_compliance.admin', false),
+  ('A.fleet_manager', 'A', 'admin.access.users_access.admin', false),
+  ('A.fleet_manager', 'A', 'fleet.operations.vessels.admin', false),
+  ('A.cw_unbound', 'A', 'vessel.crew.no_such_thing.admin', false),
+  ('A.cw_bound', 'A', 'vessel.crew.crew_list.view', false);
+GRANT SELECT ON cw_cases TO PUBLIC;
+SELECT tests.is(public.has_company_capability_for(tests.user_id(c.who), c.key, tests.company_id(c.company)), c.want,
+                format('has_company_capability_for(%s, %s, %s) is %s', c.who, c.key, c.company, c.want))
+FROM cw_cases AS c ORDER BY c.who, c.key, c.company;
+SELECT tests.ok(public.has_capability_for(tests.user_id('A.cw_bound'), 'vessel.crew.crew_compliance.admin', tests.company_id('A'), NULL)
+                AND public.has_capability_for(tests.user_id('A.cw_bound'), 'vessel.crew.crew_compliance.admin', tests.company_id('A'), tests.vessel_id('A.dra')),
+                'has_capability_for(bound role, NULL) stays the anywhere-in-the-company read answer (true), and the vessel answer is unchanged');
+SELECT tests.ok(public.has_company_capability_for(NULL, 'vessel.crew.crew_compliance.admin', tests.company_id('A')) IS FALSE
+                AND public.has_company_capability_for(tests.user_id('A.cw_unbound'), NULL, tests.company_id('A')) IS FALSE
+                AND public.has_company_capability_for(tests.user_id('A.cw_unbound'), 'vessel.crew.crew_compliance.admin', NULL) IS FALSE,
+                'NULL ids: false');
+SELECT tests.ok(NOT has_function_privilege('authenticated', 'public.has_company_capability_for(uuid,text,uuid)', 'EXECUTE')
+                AND NOT has_function_privilege('anon', 'public.has_company_capability_for(uuid,text,uuid)', 'EXECUTE')
+                AND has_function_privilege('service_role', 'public.has_company_capability_for(uuid,text,uuid)', 'EXECUTE')
+                AND NOT has_function_privilege('authenticated', 'public.capability_crew_key(uuid,text,uuid,uuid,boolean)', 'EXECUTE'),
+                'the company-wide answer and the core are internal (service role)');
+
 -- ------------------------------------------------------------ inactive personas (last: it disables every persona)
 
 UPDATE public.profiles SET account_status = 'disabled' WHERE user_id IN (SELECT tests.user_id(persona) FROM cap_personas);

@@ -21,7 +21,7 @@
 --             transfer_crew_cancel, transfer_crew (the ONE completion
 --             definer), transfer_crew_detail, crew_transfers_for_profile;
 --             crew_end_employment, crew_vessel_employment_history,
---             crew_rehire_prefill
+--             crew_rehire_prefill, crew_rehire_save (D-374)
 --   sweep     crew_transfers_complete_due (service role; hr-daily-sweeper
 --             lists it, PR-X1-K)
 -- TS mirror: src/modules/crew/types/db.pending.ts (the RPCs and the new
@@ -128,6 +128,20 @@
 -- * crew_rehire_prefill: the Add crew re-hire prefill;
 --   vessel.crew.crew_profiles.create on the vessel, and the person must be
 --   of the vessel's (the caller's) company.
+-- * crew_rehire_save (D-374): the Add crew re-hire. crew_onboarding_save
+--   refuses a person who is on no crew (its gate is "on this vessel's
+--   crew"), so a re-hire is its own definer: crew_profiles.create and
+--   crew_assignments.assign on the vessel, no external viewer, an active
+--   caller, the person of the vessel's company (P0002), D-207, a Master or
+--   Captain position needs users-access admin of the vessel (D-198); the
+--   person on no crew today (22023 on_crew_now) with no open transfer
+--   (22023 transfer_open); a person without a login is refused (0A000
+--   rehire_no_login) until the pending-placement engine (PR-X1-M): the
+--   profiles guard never turns a profile imported again. All or nothing:
+--   the assignment (as the caller, the platform guard decides, as
+--   transfer_crew's), the terms through crew_onboarding_terms_write (060300;
+--   a new employment, so the draft contract and the On board period open,
+--   D-375), the personal details when given, one audit_logs row.
 --
 -- Notifications (D-128, D-238, D-249): every emit_notification_event call
 -- sits in its own exception block, so a missing type or a fan-out problem
@@ -149,7 +163,8 @@ BEGIN
      OR to_regprocedure('public.crew_position_for(uuid,uuid,text)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261124061100_crew_transfers_employment needs the crew gate helpers and positions: apply 20261124060100_crew_reference_positions.sql first';
   END IF;
-  IF to_regclass('public.crew_assignment_terms') IS NULL OR to_regprocedure('public.crew_profile_visible(uuid)') IS NULL THEN
+  IF to_regclass('public.crew_assignment_terms') IS NULL OR to_regprocedure('public.crew_profile_visible(uuid)') IS NULL
+     OR to_regprocedure('public.crew_onboarding_terms_write(uuid,uuid,uuid,uuid,jsonb,uuid)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261124061100_crew_transfers_employment needs crew_assignment_terms: apply 20261124060300_crew_profile_details.sql first';
   END IF;
   IF to_regclass('public.vessel_crew_settings') IS NULL OR NOT EXISTS (
@@ -329,8 +344,9 @@ END;
 $$;
 
 -- A fleet approver of transfers in the company: crew_assignments.approve
--- at company level and fleet reach. False without a JWT or for an inactive
--- caller (has_capability_for). Internal.
+-- for the whole company (has_company_capability_for, D-376: a role bound
+-- to one vessel does not count) and fleet reach. False without a JWT or for
+-- an inactive caller. Internal.
 CREATE OR REPLACE FUNCTION public.crew_transfer_is_approver(p_company_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -343,7 +359,7 @@ BEGIN
   IF v_uid IS NULL OR p_company_id IS NULL THEN
     RETURN false;
   END IF;
-  RETURN coalesce(public.has_capability_for(v_uid, 'vessel.crew.crew_assignments.approve', p_company_id, NULL), false)
+  RETURN coalesce(public.has_company_capability_for(v_uid, 'vessel.crew.crew_assignments.approve', p_company_id), false)
      AND coalesce(public.fleet_reach_for(v_uid, p_company_id), false);
 END;
 $$;
@@ -1831,6 +1847,155 @@ BEGIN
 END;
 $$;
 
+-- The Add crew re-hire save (gap/04 W8; D-374): a person of the company who
+-- is on no crew today gets a new assignment on the vessel and new
+-- employment terms, all or nothing. Gate: vessel.crew.crew_profiles.create
+-- and vessel.crew.crew_assignments.assign on the vessel (crew_vessel_gate:
+-- P0002 unknown vessel, 42501), no external viewer, an active caller; the
+-- person of the vessel's company (P0002 person_not_found, D-246); D-207
+-- (crew_transfer_actor_check: 42501 out_of_reach, manages_admins_required);
+-- a Master or Captain position needs admin.access.users_access.admin of
+-- the vessel (42501 master_rehire_refused, D-198). The person must be on
+-- no crew today (22023 on_crew_now) with no open transfer (22023
+-- transfer_open); a person without a login: 0A000 rehire_no_login (the
+-- pending-placement engine, PR-X1-M). p_terms is crew_onboarding_save's
+-- payload (the position, else the last assignment's title, names the
+-- assignment); p_personal (optional) a crew_personal_details_save payload,
+-- blanks only for a non-editor. Effects: the crew_assignments row as the
+-- caller (the platform guard decides: reach, the Master office, the
+-- company rule), join date = coalesce(date_joining_vessel, start_date),
+-- current from it; the terms linked to it through
+-- crew_onboarding_terms_write (a new row: the draft contract and the On
+-- board period, D-375; a start date that already has terms on the vessel
+-- is refused, 22023 start_date_taken); the personal details; one
+-- audit_logs row. Returns {assignment_id, terms_id, contract_id,
+-- period_id}.
+CREATE OR REPLACE FUNCTION public.crew_rehire_save(p_profile_id uuid, p_vessel_id uuid, p_terms jsonb, p_personal jsonb DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_company uuid;
+  v_profile public.profiles;
+  v_start date;
+  v_joining date;
+  v_join date;
+  v_position uuid;
+  v_department text;
+  v_pos_name text;
+  v_pos_key text;
+  v_dept_label text;
+  v_new uuid;
+  v_terms_id uuid;
+  v_inserted boolean;
+  v_contract uuid;
+  v_period uuid;
+BEGIN
+  v_company := public.crew_vessel_gate('vessel.crew.crew_profiles.create', p_vessel_id, 'You can''t add crew to this vessel.');
+  PERFORM public.crew_vessel_gate('vessel.crew.crew_assignments.assign', p_vessel_id, 'You can''t assign crew to this vessel.');
+  IF public.crew_caller_is_external() THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted', DETAIL = 'You can''t add crew to this vessel.';
+  END IF;
+  IF NOT coalesce(public.user_is_active(v_uid), false) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'crew_not_permitted', DETAIL = 'Your account is not active.';
+  END IF;
+  SELECT * INTO v_profile FROM public.profiles AS p WHERE p.id = p_profile_id FOR UPDATE;
+  IF NOT FOUND OR v_profile.company_id IS DISTINCT FROM v_company THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'person_not_found', DETAIL = 'This crew member could not be found.';
+  END IF;
+  PERFORM public.crew_transfer_actor_check(p_profile_id, v_company);
+
+  -- The position and dates the assignment needs (the full terms rules run in crew_onboarding_terms_write).
+  IF p_terms IS NULL OR jsonb_typeof(p_terms) <> 'object' THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'payload_invalid', DETAIL = 'The employment details could not be read.';
+  END IF;
+  BEGIN
+    v_start := nullif(btrim(coalesce(p_terms ->> 'start_date', '')), '')::date;
+    v_joining := nullif(btrim(coalesce(p_terms ->> 'date_joining_vessel', '')), '')::date;
+    v_position := nullif(btrim(coalesce(p_terms ->> 'position_id', '')), '')::uuid;
+  EXCEPTION WHEN invalid_text_representation OR invalid_datetime_format OR datetime_field_overflow OR data_exception THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'field_invalid', DETAIL = 'One of the values could not be read. Check the dates and numbers.';
+  END;
+  IF v_start IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'start_date_required', DETAIL = 'Enter the start date.', HINT = 'start_date';
+  END IF;
+  v_department := nullif(lower(btrim(coalesce(p_terms ->> 'department_key', ''))), '');
+  IF v_position IS NOT NULL THEN
+    SELECT pos.name, pos.key INTO v_pos_name, v_pos_key FROM public.positions AS pos
+    WHERE pos.id = v_position AND pos.is_active
+      AND (pos.company_id IS NULL OR pos.company_id = v_company)
+      AND (pos.vessel_id IS NULL OR pos.vessel_id = p_vessel_id);
+    IF v_pos_name IS NULL THEN
+      RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'position_unknown', DETAIL = 'Choose a position from this vessel''s list.', HINT = 'position_id';
+    END IF;
+  ELSE
+    SELECT nullif(btrim(coalesce(nullif(btrim(x.position), ''), x.rank)), '') INTO v_pos_name
+    FROM public.crew_assignments AS x JOIN public.vessels AS v ON v.id = x.vessel_id AND v.company_id = v_company
+    WHERE v_profile.user_id IS NOT NULL AND x.user_id = v_profile.user_id
+    ORDER BY coalesce(x.leave_date, x.end_date) DESC NULLS FIRST, coalesce(x.join_date, x.start_date) DESC NULLS LAST, x.id
+    LIMIT 1;
+  END IF;
+
+  -- D-198: a Master or Captain needs users-access admin of the vessel.
+  IF (coalesce(v_pos_key IN ('master', 'captain'), false) OR coalesce(public.record_normalise_office(v_pos_name) IN ('master', 'captain'), false))
+     AND NOT coalesce(public.has_capability_for(v_uid, 'admin.access.users_access.admin', v_company, p_vessel_id), false) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'master_rehire_refused',
+      DETAIL = 'Only a users-access administrator of this vessel can re-hire a Master.';
+  END IF;
+
+  -- On no crew today, no open transfer, a login.
+  IF v_profile.user_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.crew_assignments AS x
+    WHERE x.user_id = v_profile.user_id AND public.crew_assignment_is_current(x.is_current, x.leave_date, x.end_date)
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'on_crew_now', DETAIL = 'This person is on a crew today. Transfer them instead.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.crew_transfers AS t
+             WHERE t.profile_id = p_profile_id AND t.status IN ('draft', 'review', 'pending_approval', 'scheduled')) THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'transfer_open', DETAIL = 'This person has a transfer in progress. Open it from their profile.';
+  END IF;
+  IF v_profile.user_id IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '0A000', MESSAGE = 'rehire_no_login',
+      DETAIL = 'Re-hiring someone without a sign-in is not available yet. Invite them first, or add them again as a new crew member.';
+  END IF;
+  IF v_pos_name IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'position_required', DETAIL = 'Choose the position on this vessel.', HINT = 'position_id';
+  END IF;
+
+  -- 1. The assignment, as the caller (the platform crew-assignment guard decides).
+  v_join := coalesce(v_joining, v_start);
+  SELECT d.label INTO v_dept_label FROM public.departments AS d WHERE d.key = v_department;
+  INSERT INTO public.crew_assignments (user_id, vessel_id, position, rank, department, join_date, start_date, is_current, created_by, updated_by)
+  VALUES (v_profile.user_id, p_vessel_id, v_pos_name, v_pos_name, v_dept_label, v_join, v_join, true, v_uid, v_uid)
+  RETURNING id INTO v_new;
+
+  -- 2. The terms, linked to it; a new employment opens the draft contract and the On board period (D-375).
+  SELECT (w.terms).id, w.inserted, w.contract_id, w.period_id INTO v_terms_id, v_inserted, v_contract, v_period
+  FROM public.crew_onboarding_terms_write(v_company, p_profile_id, p_vessel_id, v_new, p_terms, v_uid) AS w;
+  IF NOT v_inserted THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'start_date_taken',
+      DETAIL = 'An employment on this vessel already starts on that date. Choose the new start date.', HINT = 'start_date';
+  END IF;
+
+  -- 3. The personal details (blanks only for a non-editor).
+  IF p_personal IS NOT NULL AND p_personal <> '{}'::jsonb THEN
+    PERFORM public.crew_personal_details_apply(p_profile_id, p_personal, v_uid, NOT public.crew_profile_can_edit(p_profile_id));
+  END IF;
+
+  -- 4. The audit row.
+  INSERT INTO public.audit_logs (entity_type, entity_id, action, actor_user_id, changed_fields, new_values)
+  VALUES ('crew_profile', p_profile_id, 'UPDATE', v_uid, '["rehire"]'::jsonb,
+          jsonb_build_object('via', 'crew_rehire_save', 'vessel_id', p_vessel_id, 'assignment_id', v_new, 'terms_id', v_terms_id,
+                             'contract_id', v_contract, 'period_id', v_period, 'start_date', v_start));
+
+  RETURN jsonb_build_object('assignment_id', v_new, 'terms_id', v_terms_id, 'contract_id', v_contract, 'period_id', v_period);
+END;
+$$;
+
 -- ---------------------------------------------------------------- grants
 
 -- Pure and internal: definers and the service role only.
@@ -1884,6 +2049,8 @@ REVOKE ALL ON FUNCTION public.crew_vessel_employment_history(uuid, text) FROM PU
 GRANT EXECUTE ON FUNCTION public.crew_vessel_employment_history(uuid, text) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.crew_rehire_prefill(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.crew_rehire_prefill(uuid, uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.crew_rehire_save(uuid, uuid, jsonb, jsonb) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.crew_rehire_save(uuid, uuid, jsonb, jsonb) TO authenticated, service_role;
 
 -- The sweep: the service role only (hr-daily-sweeper).
 REVOKE ALL ON FUNCTION public.crew_transfers_complete_due(date) FROM PUBLIC, anon, authenticated, service_role;
@@ -1894,7 +2061,7 @@ GRANT EXECUTE ON FUNCTION public.crew_transfers_complete_due(date) TO service_ro
 COMMENT ON FUNCTION public.crew_transfer_next(text, text, boolean, boolean, boolean) IS 'The W9 transfer step rule (pure): review, acknowledge, submit (pending_approval when approval is required, else scheduled; acknowledgements_missing), approve, decline, cancel, complete (transfer_not_due before the sign-off date); illegal_transition / unknown_action. Mirrored by nextTransferStatus() in src/modules/crew/lib/transfer.ts.';
 COMMENT ON FUNCTION public.crew_end_reason_label(text) IS 'The words of an employment end reason (W8), for notices and the contract termination reason. Pure.';
 COMMENT ON FUNCTION public.crew_transfer_actor_check(uuid, uuid) IS 'Internal (D-207): raises 42501 out_of_reach unless admin_may_act_on_user(caller, person) and 42501 manages_admins_required for an administrator target without user_manages_admins_for.';
-COMMENT ON FUNCTION public.crew_transfer_is_approver(uuid) IS 'Internal (D-X1-12): the caller holds vessel.crew.crew_assignments.approve at company level and fleet reach (a fleet approver of transfers).';
+COMMENT ON FUNCTION public.crew_transfer_is_approver(uuid) IS 'Internal (D-X1-12, D-376): the caller holds vessel.crew.crew_assignments.approve for the whole company (has_company_capability_for; a vessel-bound role does not count) and fleet reach (a fleet approver of transfers).';
 COMMENT ON FUNCTION public.crew_transfer_fleet_hr(uuid) IS 'Internal: the company''s fleet HR logins (work_rest_is_fleet_hr), the transfer and employment notices'' must-act list.';
 COMMENT ON FUNCTION public.crew_transfer_review_snapshot(uuid) IS 'Internal (W9, C58): the pre-transfer review of a transfer: destination document requirement gaps for the new position at the sign-on date, familiarisations opening on joining, medical flags (no clinical text), the last performance review, hours-of-rest breaches in 30 days, no rest day, open familiarisation forms and training applications; each item with a fingerprint.';
 COMMENT ON FUNCTION public.crew_transfer_acknowledged(jsonb, jsonb) IS 'Internal: every review item has a tick with the same key and fingerprint.';
@@ -1916,3 +2083,4 @@ COMMENT ON FUNCTION public.crew_transfers_complete_due(date) IS 'Daily sweep (PR
 COMMENT ON FUNCTION public.crew_end_employment(uuid, uuid, date, text, text) IS 'Ends a person''s employment on a vessel (gap/04 W8, C57): contracts_employment.edit on the vessel plus D-207; ends the assignment (guard as the caller) and terms, expires or terminates the active contract, removes and trims planner periods, names the final hours-of-rest month, emits crew_employment_ended. Reasons: contract_end, resignation, dismissal, medical, end_of_temporary_contract, transfer_to_another_employer, retirement, other (note required).';
 COMMENT ON FUNCTION public.crew_vessel_employment_history(uuid, text) IS 'The vessel''s employment history (gap/04 C59): ended assignments of the company''s people, position, department, dates, duration, end reason and note, where they are now; contracts_employment.view on the vessel, no external viewer.';
 COMMENT ON FUNCTION public.crew_rehire_prefill(uuid, uuid) IS 'The Add crew re-hire prefill (gap/04 W8): names (email with crew_profiles.view or HR), login, current vessel, last assignment and last terms. Gate: vessel.crew.crew_profiles.create on the vessel; the person of the vessel''s company (P0002).';
+COMMENT ON FUNCTION public.crew_rehire_save(uuid, uuid, jsonb, jsonb) IS 'The Add crew re-hire (gap/04 W8; D-374): a person of the company on no crew today gets a new assignment on the vessel (as the caller: the platform guard decides) and new terms linked to it through crew_onboarding_terms_write (the draft contract and the On board period open, D-375), the personal details when given and one audit row, all or nothing. Gate: crew_profiles.create and crew_assignments.assign on the vessel, no external viewer, active caller, the person of the company (P0002), D-207, a Master or Captain position needs users-access admin (42501 master_rehire_refused, D-198); 22023 on_crew_now, transfer_open, start_date_taken, position_required; 0A000 rehire_no_login until PR-X1-M. Returns {assignment_id, terms_id, contract_id, period_id}.';

@@ -5,9 +5,12 @@
 --   account_membership_vessels_select_admin (users-access viewers read
 --   their company's memberships)
 -- Helpers: legacy_user_admin(), role_rank(), user_role_rank(),
---   has_capability(), has_capability_for(), user_company_for_admin(),
---   is_company_actor(), admin_scope_all(), admin_may_act_on_user()
---   (service role; definers), admin_may_view_user() (RLS predicate)
+--   has_capability(), has_capability_for(), capability_crew_key() (the
+--   crew-key core, one key table), has_company_capability_for() (the
+--   company-wide crew-key answer, D-376; edited in place by the P3W1 review
+--   round, D-120), user_company_for_admin(), is_company_actor(),
+--   admin_scope_all(), admin_may_act_on_user() (service role; definers),
+--   admin_may_view_user() (RLS predicate)
 -- TS mirror: src/modules/auth/types/db.pending.ts (AuthPendingFunctions
 --   has_capability / is_company_actor); the interim client adaptor useCan
 --   and the edge fallback supabase/functions/_shared/capability.ts
@@ -204,8 +207,13 @@ $$;
 -- adaptor) holds the parity cases. On top of the adaptor, which sees no
 -- vessel, a given vessel must be in reach (reach_vessel_for); with no
 -- vessel the answer is the company-level one (no reach part), as for the
--- admin keys. The access state, read as the client's permissionsStore
--- loads it:
+-- admin keys: 'anywhere in the company', so a vessel-scope permission of a
+-- role bound to one vessel counts. A definer that changes something for
+-- every vessel of the company asks has_company_capability_for instead
+-- (D-376), which counts only what holds company-wide. The rules live in
+-- capability_crew_key (the one key table); has_capability_for calls it
+-- with the company-wide flag off. The access state, read as the client's
+-- permissionsStore loads it:
 --   RBAC roles     active, in-date rbac_user_roles role names
 --                  (get_user_roles_full)
 --   permissions    module_key:level of the active, in-date RBAC role
@@ -248,7 +256,19 @@ $$;
 --     crew.approve_hours_of_rest; leave_requests.approve crew.approve_leave;
 --     contracts_employment.view crew.access_employment_records;
 --     crew_medical_records.view crew.view_medical
-CREATE OR REPLACE FUNCTION public.has_capability_for(_user_id uuid, p_key text, p_company_id uuid, p_vessel_id uuid DEFAULT NULL)
+-- The crew-key core (PP1; D-376): the crew, HR and health keys for any
+-- user, with the key table of has_capability_for (its one definition). In
+-- the default mode (p_company_wide false) it answers exactly what
+-- has_capability_for answers for these keys; with p_vessel_id NULL that is
+-- the 'anywhere in the company' read answer, where a vessel-scoped
+-- permission of a role bound to one vessel counts. In the company-wide mode
+-- (has_company_capability_for, p_vessel_id NULL) it counts only what holds
+-- for the whole company: the full-access paths (RBAC superadmin / dpa,
+-- legacy dpa / shore_management), RBAC permission rows of a role bound to no
+-- vessel or of a scope other than 'vessel', granted overrides bound to no
+-- vessel, the legacy flags on those rows, and the HR / medical domain
+-- helpers; never the nav fallback. Internal (service role; definers).
+CREATE OR REPLACE FUNCTION public.capability_crew_key(_user_id uuid, p_key text, p_company_id uuid, p_vessel_id uuid, p_company_wide boolean)
 RETURNS boolean
 LANGUAGE plpgsql
 STABLE
@@ -258,14 +278,7 @@ AS $$
 DECLARE
   v_company uuid;
   v_role text;
-  v_kind text;
-  v_level text;
-  v_scope text;
-  v_is_dpa boolean;
-  v_full boolean;
-  v_ua text;
-  v_scope_ok boolean;
-  -- crew keys
+  v_wide boolean := coalesce(p_company_wide, false);
   v_action text;
   v_path text;
   v_module text;
@@ -278,14 +291,10 @@ DECLARE
   v_want text[];
   v_nav_ok boolean;
 BEGIN
-  IF _user_id IS NULL OR p_company_id IS NULL OR p_key IS NULL THEN
+  IF _user_id IS NULL OR p_company_id IS NULL OR p_key IS NULL OR (v_wide AND p_vessel_id IS NOT NULL) THEN
     RETURN false;
   END IF;
   IF p_key NOT IN (
-    'admin.access.users_access.view', 'admin.access.users_access.assign', 'admin.access.users_access.admin',
-    'admin.access.roles_permissions.admin', 'admin.access.permission_audit_log.view',
-    'fleet.operations.vessels.view', 'fleet.operations.vessels.admin',
-    -- crew keys (PP1)
     'vessel.crew.crew_list.view', 'vessel.crew.crew_list.export',
     'vessel.crew.crew_profiles.view', 'vessel.crew.crew_profiles.view_own', 'vessel.crew.crew_profiles.create', 'vessel.crew.crew_profiles.edit',
     'vessel.crew.crew_certificates.view', 'vessel.crew.crew_certificates.view_own', 'vessel.crew.crew_certificates.create',
@@ -307,7 +316,6 @@ BEGIN
   IF NOT public.user_is_active(_user_id) THEN
     RETURN false;
   END IF;
-
   SELECT p.company_id, p.role::text INTO v_company, v_role FROM public.profiles AS p WHERE p.user_id = _user_id;
   IF v_company IS DISTINCT FROM p_company_id THEN
     RETURN false;
@@ -315,133 +323,179 @@ BEGIN
   IF p_vessel_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.vessels AS v WHERE v.id = p_vessel_id AND v.company_id = p_company_id) THEN
     RETURN false;
   END IF;
+  IF p_vessel_id IS NOT NULL AND NOT public.reach_vessel_for(_user_id, p_vessel_id) THEN
+    RETURN false;
+  END IF;
+  v_action := substring(p_key FROM '[a-z_]+$');
+  v_path := left(p_key, length(p_key) - length(v_action) - 1);
+  IF v_action = 'view_own' THEN
+    RETURN true;  -- an active member who reaches the vessel; the definer checks the subject
+  END IF;
 
-  -- ---------------------------------------------------------- crew keys (PP1)
-  IF p_key LIKE 'vessel.crew.%' OR p_key LIKE 'hris.%' OR p_key LIKE 'health.%' THEN
-    IF p_vessel_id IS NOT NULL AND NOT public.reach_vessel_for(_user_id, p_vessel_id) THEN
+  CASE v_path
+    WHEN 'vessel.crew.crew_list' THEN
+      v_module := 'crew_roster'; v_nav := 'crew';
+      v_flag := CASE v_action WHEN 'view' THEN 'crew.see_crew_list' END;
+    WHEN 'vessel.crew.crew_profiles' THEN
+      v_module := 'crew_roster'; v_nav := 'crew';
+      v_flag := CASE v_action WHEN 'view' THEN 'crew.view_crew_profiles' WHEN 'edit' THEN 'crew.edit_crew_profiles' END;
+    WHEN 'vessel.crew.crew_scheduling' THEN
+      v_module := 'crew_roster'; v_nav := 'crew';
+      v_flag := CASE v_action WHEN 'view' THEN 'crew.view_scheduling' END;
+    WHEN 'vessel.crew.crew_assignments' THEN
+      v_module := 'crew_roster'; v_nav := 'crew';
+    WHEN 'vessel.crew.hours_of_rest' THEN
+      v_module := 'crew_roster'; v_nav := 'crew';
+      v_flag := CASE v_action WHEN 'approve' THEN 'crew.approve_hours_of_rest' END;
+    WHEN 'vessel.crew.crew_certificates', 'vessel.crew.expiry_alerts', 'vessel.crew.crew_compliance' THEN
+      v_module := 'crew_certificates'; v_nav := 'crew';
+    WHEN 'vessel.crew.familiarisation' THEN
+      v_module := 'training'; v_nav := 'development';
+    WHEN 'hris.leave_rotation.leave_requests' THEN
+      v_domain := 'hr';
+      v_flag := CASE v_action WHEN 'approve' THEN 'crew.approve_leave' END;
+    WHEN 'hris.employee_records.contracts_employment' THEN
+      v_domain := 'hr';
+      v_flag := CASE v_action WHEN 'view' THEN 'crew.access_employment_records' END;
+    WHEN 'health.personnel_medical.crew_medical_records' THEN
+      v_domain := 'medical';
+      v_flag := CASE v_action WHEN 'view' THEN 'crew.view_medical' END;
+    ELSE
       RETURN false;
-    END IF;
-    v_action := substring(p_key FROM '[a-z_]+$');
-    v_path := left(p_key, length(p_key) - length(v_action) - 1);
-    IF v_action = 'view_own' THEN
-      RETURN true;  -- an active member who reaches the vessel; the definer checks the subject
-    END IF;
+  END CASE;
 
-    CASE v_path
-      WHEN 'vessel.crew.crew_list' THEN
-        v_module := 'crew_roster'; v_nav := 'crew';
-        v_flag := CASE v_action WHEN 'view' THEN 'crew.see_crew_list' END;
-      WHEN 'vessel.crew.crew_profiles' THEN
-        v_module := 'crew_roster'; v_nav := 'crew';
-        v_flag := CASE v_action WHEN 'view' THEN 'crew.view_crew_profiles' WHEN 'edit' THEN 'crew.edit_crew_profiles' END;
-      WHEN 'vessel.crew.crew_scheduling' THEN
-        v_module := 'crew_roster'; v_nav := 'crew';
-        v_flag := CASE v_action WHEN 'view' THEN 'crew.view_scheduling' END;
-      WHEN 'vessel.crew.crew_assignments' THEN
-        v_module := 'crew_roster'; v_nav := 'crew';
-      WHEN 'vessel.crew.hours_of_rest' THEN
-        v_module := 'crew_roster'; v_nav := 'crew';
-        v_flag := CASE v_action WHEN 'approve' THEN 'crew.approve_hours_of_rest' END;
-      WHEN 'vessel.crew.crew_certificates', 'vessel.crew.expiry_alerts', 'vessel.crew.crew_compliance' THEN
-        v_module := 'crew_certificates'; v_nav := 'crew';
-      WHEN 'vessel.crew.familiarisation' THEN
-        v_module := 'training'; v_nav := 'development';
-      WHEN 'hris.leave_rotation.leave_requests' THEN
-        v_domain := 'hr';
-        v_flag := CASE v_action WHEN 'approve' THEN 'crew.approve_leave' END;
-      WHEN 'hris.employee_records.contracts_employment' THEN
-        v_domain := 'hr';
-        v_flag := CASE v_action WHEN 'view' THEN 'crew.access_employment_records' END;
-      WHEN 'health.personnel_medical.crew_medical_records' THEN
-        v_domain := 'medical';
-        v_flag := CASE v_action WHEN 'view' THEN 'crew.view_medical' END;
-      ELSE
-        RETURN false;
-    END CASE;
+  -- requiredLevel(): the catalogue's crewCreates (hours_of_rest) and crewSigns (familiarisation)
+  v_need := CASE
+    WHEN v_action IN ('view', 'export') THEN 'view'
+    WHEN v_action = 'create' THEN CASE WHEN v_path = 'vessel.crew.hours_of_rest' THEN 'self' ELSE 'edit' END
+    WHEN v_action = 'sign' THEN CASE WHEN v_path = 'vessel.crew.familiarisation' THEN 'self' ELSE 'edit' END
+    WHEN v_action IN ('edit', 'assign', 'approve') THEN 'edit'
+    ELSE 'admin'
+  END;
 
-    -- requiredLevel(): the catalogue's crewCreates (hours_of_rest) and crewSigns (familiarisation)
-    v_need := CASE
-      WHEN v_action IN ('view', 'export') THEN 'view'
-      WHEN v_action = 'create' THEN CASE WHEN v_path = 'vessel.crew.hours_of_rest' THEN 'self' ELSE 'edit' END
-      WHEN v_action = 'sign' THEN CASE WHEN v_path = 'vessel.crew.familiarisation' THEN 'self' ELSE 'edit' END
-      WHEN v_action IN ('edit', 'assign', 'approve') THEN 'edit'
-      ELSE 'admin'
-    END;
+  SELECT coalesce(array_agg(DISTINCT lower(ro.name)), ARRAY[]::text[]) INTO v_roles
+  FROM public.rbac_user_roles AS r
+  JOIN public.roles AS ro ON ro.id = r.role_id
+  WHERE r.user_id = _user_id
+    AND r.is_active = true
+    AND (r.valid_until IS NULL OR r.valid_until > now());
 
-    SELECT coalesce(array_agg(DISTINCT lower(ro.name)), ARRAY[]::text[]) INTO v_roles
+  -- Company-wide mode (D-376): a vessel-scoped permission of a role bound
+  -- to one vessel, and an override bound to a vessel, never count.
+  SELECT coalesce(array_agg(DISTINCT x.module_key || ':' || x.permission), ARRAY[]::text[]) INTO v_perms
+  FROM (
+    SELECT rp.module_key, rp.permission::text AS permission
     FROM public.rbac_user_roles AS r
-    JOIN public.roles AS ro ON ro.id = r.role_id
+    JOIN public.role_permissions AS rp ON rp.role_id = r.role_id
     WHERE r.user_id = _user_id
       AND r.is_active = true
-      AND (r.valid_until IS NULL OR r.valid_until > now());
+      AND (r.valid_until IS NULL OR r.valid_until > now())
+      AND CASE WHEN v_wide THEN (r.vessel_id IS NULL OR rp.scope IS DISTINCT FROM 'vessel')
+               ELSE (rp.scope IS DISTINCT FROM 'vessel' OR r.vessel_id IS NULL OR p_vessel_id IS NULL OR r.vessel_id = p_vessel_id) END
+    UNION ALL
+    SELECT o.module_key, o.permission::text
+    FROM public.user_permission_overrides AS o
+    WHERE o.user_id = _user_id
+      AND o.is_granted = true
+      AND (o.valid_until IS NULL OR o.valid_until > now())
+      AND (NOT v_wide OR o.vessel_id IS NULL)
+  ) AS x;
 
-    SELECT coalesce(array_agg(DISTINCT x.module_key || ':' || x.permission), ARRAY[]::text[]) INTO v_perms
-    FROM (
-      SELECT rp.module_key, rp.permission::text AS permission
-      FROM public.rbac_user_roles AS r
-      JOIN public.role_permissions AS rp ON rp.role_id = r.role_id
-      WHERE r.user_id = _user_id
-        AND r.is_active = true
-        AND (r.valid_until IS NULL OR r.valid_until > now())
-        AND (rp.scope IS DISTINCT FROM 'vessel' OR r.vessel_id IS NULL OR p_vessel_id IS NULL OR r.vessel_id = p_vessel_id)
-      UNION ALL
-      SELECT o.module_key, o.permission::text
-      FROM public.user_permission_overrides AS o
-      WHERE o.user_id = _user_id
-        AND o.is_granted = true
-        AND (o.valid_until IS NULL OR o.valid_until > now())
-    ) AS x;
-
-    -- The catalogue legacy flag grants the action; without it an approval needs the rule at admin.
-    IF v_flag IS NOT NULL THEN
-      IF v_perms && ARRAY[v_flag || ':view', v_flag || ':edit', v_flag || ':admin'] THEN
-        RETURN true;
-      END IF;
-      IF v_action IN ('approve', 'final_approve') THEN
-        v_need := 'admin';
-      END IF;
-    END IF;
-
-    IF v_domain = 'hr' THEN
-      RETURN coalesce(CASE v_need
-        WHEN 'view' THEN public.hr_can_view(_user_id)
-        WHEN 'edit' THEN public.hr_can_edit(_user_id)
-        WHEN 'admin' THEN public.hr_can_admin(_user_id)
-        ELSE false
-      END, false);
-    END IF;
-    IF v_domain = 'medical' THEN
-      RETURN coalesce(CASE v_need
-        WHEN 'view' THEN public.medical_can_view(_user_id)
-        WHEN 'edit' THEN public.medical_can_edit(_user_id)
-        WHEN 'admin' THEN public.medical_can_admin(_user_id)
-        ELSE false
-      END, false);
-    END IF;
-
-    -- RBAC rule: full access, the module permission at the level, or (self / view) the nav check.
-    IF v_roles && ARRAY['superadmin', 'dpa'] OR v_role IN ('dpa', 'shore_management') THEN
+  -- The catalogue legacy flag grants the action; without it an approval needs the rule at admin.
+  IF v_flag IS NOT NULL THEN
+    IF v_perms && ARRAY[v_flag || ':view', v_flag || ':edit', v_flag || ':admin'] THEN
       RETURN true;
     END IF;
-    v_want := CASE v_need
-      WHEN 'admin' THEN ARRAY[v_module || ':admin']
-      WHEN 'edit' THEN ARRAY[v_module || ':edit', v_module || ':admin']
-      ELSE ARRAY[v_module || ':view', v_module || ':edit', v_module || ':admin']
-    END;
-    IF v_perms && v_want THEN
-      RETURN true;
+    IF v_action IN ('approve', 'final_approve') THEN
+      v_need := 'admin';
     END IF;
-    IF v_need NOT IN ('self', 'view') THEN
-      RETURN false;
-    END IF;
-    v_nav_ok := v_roles && ARRAY['superadmin', 'dpa', 'fleet_master']
-      OR CASE v_nav
-           WHEN 'crew' THEN v_perms && ARRAY['crew_roster:view', 'crew_roster:edit', 'crew_roster:admin']
-                            OR coalesce(v_role IN ('dpa', 'shore_management', 'master', 'chief_officer'), false)
-           WHEN 'development' THEN v_perms && ARRAY['training:view', 'training:edit', 'training:admin']
-           ELSE false
-         END;
-    RETURN coalesce(v_nav_ok, false);
+  END IF;
+
+  IF v_domain = 'hr' THEN
+    RETURN coalesce(CASE v_need
+      WHEN 'view' THEN public.hr_can_view(_user_id)
+      WHEN 'edit' THEN public.hr_can_edit(_user_id)
+      WHEN 'admin' THEN public.hr_can_admin(_user_id)
+      ELSE false
+    END, false);
+  END IF;
+  IF v_domain = 'medical' THEN
+    RETURN coalesce(CASE v_need
+      WHEN 'view' THEN public.medical_can_view(_user_id)
+      WHEN 'edit' THEN public.medical_can_edit(_user_id)
+      WHEN 'admin' THEN public.medical_can_admin(_user_id)
+      ELSE false
+    END, false);
+  END IF;
+
+  -- RBAC rule: full access, the module permission at the level, or (self / view) the nav check.
+  IF v_roles && ARRAY['superadmin', 'dpa'] OR v_role IN ('dpa', 'shore_management') THEN
+    RETURN true;
+  END IF;
+  v_want := CASE v_need
+    WHEN 'admin' THEN ARRAY[v_module || ':admin']
+    WHEN 'edit' THEN ARRAY[v_module || ':edit', v_module || ':admin']
+    ELSE ARRAY[v_module || ':view', v_module || ':edit', v_module || ':admin']
+  END;
+  IF v_perms && v_want THEN
+    RETURN true;
+  END IF;
+  IF v_wide OR v_need NOT IN ('self', 'view') THEN
+    RETURN false;
+  END IF;
+  v_nav_ok := v_roles && ARRAY['superadmin', 'dpa', 'fleet_master']
+    OR CASE v_nav
+         WHEN 'crew' THEN v_perms && ARRAY['crew_roster:view', 'crew_roster:edit', 'crew_roster:admin']
+                          OR coalesce(v_role IN ('dpa', 'shore_management', 'master', 'chief_officer'), false)
+         WHEN 'development' THEN v_perms && ARRAY['training:view', 'training:edit', 'training:admin']
+         ELSE false
+       END;
+  RETURN coalesce(v_nav_ok, false);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.has_capability_for(_user_id uuid, p_key text, p_company_id uuid, p_vessel_id uuid DEFAULT NULL)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_company uuid;
+  v_role text;
+  v_kind text;
+  v_level text;
+  v_scope text;
+  v_is_dpa boolean;
+  v_full boolean;
+  v_ua text;
+  v_scope_ok boolean;
+BEGIN
+  IF _user_id IS NULL OR p_company_id IS NULL OR p_key IS NULL THEN
+    RETURN false;
+  END IF;
+  -- ---------------------------------------------------------- crew keys (PP1): the one key table is the core's (D-376)
+  IF p_key LIKE 'vessel.crew.%' OR p_key LIKE 'hris.%' OR p_key LIKE 'health.%' THEN
+    RETURN coalesce(public.capability_crew_key(_user_id, p_key, p_company_id, p_vessel_id, false), false);
+  END IF;
+  IF p_key NOT IN (
+    'admin.access.users_access.view', 'admin.access.users_access.assign', 'admin.access.users_access.admin',
+    'admin.access.roles_permissions.admin', 'admin.access.permission_audit_log.view',
+    'fleet.operations.vessels.view', 'fleet.operations.vessels.admin'
+  ) THEN
+    RETURN false;
+  END IF;
+  IF NOT public.user_is_active(_user_id) THEN
+    RETURN false;
+  END IF;
+
+  SELECT p.company_id, p.role::text INTO v_company, v_role FROM public.profiles AS p WHERE p.user_id = _user_id;
+  IF v_company IS DISTINCT FROM p_company_id THEN
+    RETURN false;
+  END IF;
+  IF p_vessel_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.vessels AS v WHERE v.id = p_vessel_id AND v.company_id = p_company_id) THEN
+    RETURN false;
   END IF;
 
   -- ---------------------------------------------------------- the seven admin keys
@@ -477,6 +531,30 @@ BEGIN
     WHEN 'fleet.operations.vessels.admin' THEN v_full OR (coalesce(v_kind = 'admin', false) AND v_scope = 'all')
     ELSE false
   END, false);
+END;
+$$;
+
+-- The company-wide answer of a crew, HR or health key (D-376): what the
+-- user holds for the whole company, not "somewhere in it". The definers
+-- that change something for every vessel of the company (company document
+-- types and their satisfiers, company positions and alias re-points,
+-- company familiarisation templates, the fleet approval of transfers) ask
+-- this instead of has_capability_for(..., NULL), which stays the 'anywhere
+-- in the company' read answer. Any other key, NULL ids, an inactive user or
+-- another company: false. Internal (service role; definers).
+CREATE OR REPLACE FUNCTION public.has_company_capability_for(_user_id uuid, p_key text, p_company_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF _user_id IS NULL OR p_key IS NULL OR p_company_id IS NULL
+     OR NOT (p_key LIKE 'vessel.crew.%' OR p_key LIKE 'hris.%' OR p_key LIKE 'health.%') THEN
+    RETURN false;
+  END IF;
+  RETURN coalesce(public.capability_crew_key(_user_id, p_key, p_company_id, NULL, true), false);
 END;
 $$;
 
@@ -759,7 +837,9 @@ CREATE POLICY account_membership_vessels_select_admin ON public.account_membersh
 REVOKE ALL ON FUNCTION public.legacy_user_admin(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.role_rank(text) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.user_role_rank(uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.capability_crew_key(uuid, text, uuid, uuid, boolean) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.has_capability_for(uuid, text, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.has_company_capability_for(uuid, text, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.has_capability(text, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.user_company_for_admin(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.is_company_actor(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
@@ -770,7 +850,9 @@ REVOKE ALL ON FUNCTION public.admin_may_view_user(uuid, uuid, uuid) FROM PUBLIC,
 GRANT EXECUTE ON FUNCTION public.legacy_user_admin(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.role_rank(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.user_role_rank(uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.capability_crew_key(uuid, text, uuid, uuid, boolean) TO service_role;
 GRANT EXECUTE ON FUNCTION public.has_capability_for(uuid, text, uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.has_company_capability_for(uuid, text, uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.has_capability(text, uuid, uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.user_company_for_admin(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.is_company_actor(uuid, uuid) TO authenticated, service_role;
@@ -783,7 +865,9 @@ GRANT EXECUTE ON FUNCTION public.admin_may_view_user(uuid, uuid, uuid) TO authen
 COMMENT ON FUNCTION public.legacy_user_admin(uuid) IS 'Today''s admin rule for an active user: legacy role dpa / shore_management, a user_roles dpa / superadmin row of their own company or of no company (CC-5), an RBAC superadmin / dpa role, or RBAC settings admin. Internal (service role; definers). The edge fallback legacyCapability applies the same rule.';
 COMMENT ON FUNCTION public.role_rank(text) IS 'Rank of a role name (superadmin 100 ... crew 10, anything else 0) for the no-self-escalation rules. Internal.';
 COMMENT ON FUNCTION public.user_role_rank(uuid) IS 'The highest rank an active user holds (RBAC roles and the legacy profile role). Internal.';
-COMMENT ON FUNCTION public.has_capability_for(uuid, text, uuid, uuid) IS 'The seven Phase 2 admin keys and the crew keys of Phase 3 wave 1 (vessel.crew.{crew_list, crew_profiles, crew_certificates, expiry_alerts, crew_compliance, crew_assignments, crew_scheduling, hours_of_rest, familiarisation}, hris.leave_rotation.leave_requests.approve, hris.employee_records.contracts_employment.view/edit, health.personnel_medical.crew_medical_records.view) for any user in a company (and vessel). Crew keys mirror the client adaptor resolveCapability (D-04; parity fixture capability-cases.json), need the given vessel in reach (reach_vessel_for) and answer at company level with no vessel; view_own is any active member who reaches the vessel (definers check the subject). Unknown key, inactive user, other company or foreign vessel: false. Service role only; definers call it.';
+COMMENT ON FUNCTION public.has_capability_for(uuid, text, uuid, uuid) IS 'The seven Phase 2 admin keys and the crew keys of Phase 3 wave 1 (vessel.crew.{crew_list, crew_profiles, crew_certificates, expiry_alerts, crew_compliance, crew_assignments, crew_scheduling, hours_of_rest, familiarisation}, hris.leave_rotation.leave_requests.approve, hris.employee_records.contracts_employment.view/edit, health.personnel_medical.crew_medical_records.view) for any user in a company (and vessel). Crew keys mirror the client adaptor resolveCapability (D-04; parity fixture capability-cases.json), need the given vessel in reach (reach_vessel_for) and answer at company level with no vessel; view_own is any active member who reaches the vessel (definers check the subject). With no vessel a crew key is the anywhere-in-the-company read answer (a vessel-bound role counts); company-wide writes ask has_company_capability_for (D-376). The crew-key rules live in capability_crew_key (one key table). Unknown key, inactive user, other company or foreign vessel: false. Service role only; definers call it.';
+COMMENT ON FUNCTION public.capability_crew_key(uuid, text, uuid, uuid, boolean) IS 'The one definition of the crew, HR and health keys (PP1; D-376): has_capability_for answers them through it (p_company_wide false, unchanged answers, parity fixture capability-cases.json); has_company_capability_for asks it company-wide (no vessel; only full access, permission rows of roles bound to no vessel or of a non-vessel scope, overrides bound to no vessel, the legacy flags on those rows and the HR / medical helpers; no nav fallback). Internal (service role; definers).';
+COMMENT ON FUNCTION public.has_company_capability_for(uuid, text, uuid) IS 'D-376: the company-wide answer of a crew, HR or health key for any user: full access (RBAC superadmin / dpa, legacy dpa / shore_management), RBAC permission rows of a role bound to no vessel or of a scope other than vessel, granted overrides bound to no vessel, the legacy flags on those rows, and the HR / medical domain helpers. A role bound to one vessel with a vessel-scope permission does not count. Used by the definers that change every vessel of the company; has_capability_for(..., NULL) stays the anywhere-in-the-company read answer. Any other key, NULL ids, inactive user or another company: false. Internal (service role; definers).';
 COMMENT ON FUNCTION public.has_capability(text, uuid, uuid) IS 'has_capability_for(auth.uid(), ...): the caller''s capability; false without a caller. Policies and RPCs use it. plpgsql (D-229).';
 COMMENT ON FUNCTION public.user_company_for_admin(uuid) IS 'The target user''s company when the active caller is in it (service role: always); ignores the target''s own active state. Used by RBAC policies. plpgsql (D-229).';
 COMMENT ON FUNCTION public.is_company_actor(uuid, uuid) IS 'gap/01 W10 interim: whether the user acts as the company for a vessel (or, with no vessel, a fleet record): full admin, or a non-legacy admin membership reaching the vessel. Never shore staff or crew.';

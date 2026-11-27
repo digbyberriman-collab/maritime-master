@@ -85,6 +85,12 @@ SELECT tests.seed_role('x7a_training_admin', 'fleet');
 INSERT INTO public.role_permissions (role_id, module_key, permission, scope)
 SELECT r.id, 'training', 'admin', 'fleet' FROM public.roles AS r WHERE r.name = 'x7a_training_admin';
 SELECT tests.seed_rbac_role('A.trn_admin', 'x7a_training_admin');
+-- An HR viewer (RBAC hr view), no training rights: W3 completion notifies HR (D-383).
+SELECT tests.seed_user('A', 'A.hr_viewer', 'crew');
+SELECT tests.seed_role('x7a_hr_view', 'fleet');
+INSERT INTO public.role_permissions (role_id, module_key, permission, scope)
+SELECT r.id, 'hr', 'view', 'fleet' FROM public.roles AS r WHERE r.name = 'x7a_hr_view';
+SELECT tests.seed_rbac_role('A.hr_viewer', 'x7a_hr_view');
 
 -- Company B crew.
 SELECT tests.seed_user('B', 'B.crew', 'crew');
@@ -1001,6 +1007,46 @@ SELECT tests.ok(position('next_reference_value' IN pg_get_functiondef('public.de
                 AND position('next_reference_value' IN pg_get_functiondef('public.generate_dev_application_number()'::regprocedure)) = 0
                 AND position('development_application_number_for' IN pg_get_functiondef('public.generate_dev_application_number()'::regprocedure)) > 0,
                 'numbering: the trigger draws from the counter');
+-- A browser caller cannot choose the number (D-379): the trigger fires for
+-- every insert (no WHEN clause) and replaces a supplied number with the
+-- counter value, so one crew member cannot take the next number and block
+-- every later application of the company on the unique key.
+SELECT tests.ok(pg_get_triggerdef(t.oid) NOT LIKE '%WHEN%' AND pg_get_triggerdef(t.oid) LIKE '%BEFORE INSERT%FOR EACH ROW EXECUTE FUNCTION generate_dev_application_number()%',
+                'numbering: trg_dev_application_number fires for every insert (no WHEN clause)')
+FROM pg_trigger AS t WHERE t.tgname = 'trg_dev_application_number' AND t.tgrelid = 'public.development_applications'::regclass;
+UPDATE public.reference_counters SET next_value = 500 WHERE scope = 'dev_app:' || tests.company_id('A')::text;
+SELECT tests.as_user(tests.user_id('A.stew_dra'));
+SELECT tests.lives(format($q$INSERT INTO public.development_applications (id, company_id, crew_member_id, vessel_id, course_name, category, application_number)
+                             VALUES (%L, %L, %L, %L, 'Squat', 'professional', 'CDA-' || to_char(now(), 'YYYYMMDD') || '-0501')$q$,
+                          tests.id('app:squat'), tests.company_id('A'), tests.user_id('A.stew_dra'), tests.vessel_id('A.dra')),
+                   'numbering: a crew insert that names the next number saves');
+SELECT tests.lives(format($q$INSERT INTO public.development_applications (id, company_id, crew_member_id, vessel_id, course_name, category, application_number)
+                             VALUES (%L, %L, %L, %L, 'Squat 2', 'professional', 'APPROVED-BY-CAPTAIN')$q$,
+                          tests.id('app:squat2'), tests.company_id('A'), tests.user_id('A.stew_dra'), tests.vessel_id('A.dra')),
+                   'numbering: and one that names a made-up number');
+SELECT tests.as_user(tests.user_id('A.deck_dra'));
+SELECT tests.lives(format($q$INSERT INTO public.development_applications (id, company_id, crew_member_id, vessel_id, course_name, category)
+                             VALUES (%L, %L, %L, %L, 'After the squat', 'professional')$q$,
+                          tests.id('app:after_squat'), tests.company_id('A'), tests.user_id('A.deck_dra'), tests.vessel_id('A.dra')),
+                   'numbering: the next crew insert of the company still succeeds');
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT right(application_number, 4) FROM public.development_applications WHERE id IN (%L, %L, %L) ORDER BY right(application_number, 4)$q$,
+         tests.id('app:squat'), tests.id('app:squat2'), tests.id('app:after_squat')),
+  $q$VALUES ('0500'), ('0501'), ('0502')$q$,
+  'numbering: the supplied numbers were replaced by the counter values 500 and 501, and the next insert got 502');
+SELECT tests.ok((SELECT application_number ~ '^CDA-[0-9]{8}-0501$' FROM public.development_applications WHERE id = tests.id('app:squat2')),
+                'numbering: the made-up number is gone');
+SELECT tests.is((SELECT application_number FROM public.development_applications WHERE id = tests.id('app:b_old')), 'CDA-20250101-0041',
+                'numbering: an owner / service import keeps the number it gives');
+SELECT tests.as_service();
+SELECT tests.lives(format($q$INSERT INTO public.development_applications (id, company_id, crew_member_id, vessel_id, course_name, category, application_number)
+                             VALUES (%L, %L, %L, %L, 'Service import', 'professional', 'CDA-20250102-0007')$q$,
+                          tests.id('app:svc_import'), tests.company_id('B'), tests.user_id('B.crew'), tests.vessel_id('B.lev')),
+                   'numbering: the service role imports with its own number');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT application_number FROM public.development_applications WHERE id = tests.id('app:svc_import')), 'CDA-20250102-0007',
+                'numbering: and keeps it');
 
 -- ------------------------------------------------------------ notifications (X4)
 
@@ -1037,6 +1083,20 @@ BEGIN
                    'notifications: and tells the applicant (personal Training)');
   PERFORM tests.ok(EXISTS (SELECT 1 FROM public.notification_inbox WHERE user_id = tests.user_id('A.deck_dra') AND record_id = v_app),
                    'notifications: the applicant''s inbox has it');
+  -- Completion (W3): the training admins and the company's HR viewers, never crew (D-383).
+  PERFORM tests.is(public.hr_can_view(tests.user_id('A.hr_viewer')) AND NOT public.fleet_ops_can_for(tests.user_id('A.hr_viewer'), tests.company_id('A'), NULL, 'training', 'admin'),
+                   true, 'notifications: the HR viewer reads HR and is no training admin');
+  v_app := pg_temp.app('enrolled');
+  PERFORM tests.as_user(tests.user_id('A.deck_dra'));
+  PERFORM public.development_transition(v_app, 'complete', pg_temp.payload('complete'));
+  PERFORM tests.reset_role();
+  SELECT * INTO v_out FROM public.notification_outbox WHERE record_id = v_app AND type_key = 'training_application_action_needed' AND payload ->> 'stage' = 'training_admin' LIMIT 1;
+  PERFORM tests.ok(v_out.id IS NOT NULL AND v_out.link_scope = 'fleet' AND v_out.link_path = 'training/applications'
+                   AND v_out.must_act_user_ids @> ARRAY[tests.user_id('A.trn_admin'), tests.user_id('A.hr_viewer')],
+                   'notifications: completion tells a training admin and an HR viewer (Fleet Training)');
+  PERFORM tests.ok(NOT (tests.user_id('A.stew_dra') = ANY (v_out.must_act_user_ids)) AND NOT (tests.user_id('A.deck_dra') = ANY (v_out.must_act_user_ids))
+                   AND NOT (tests.user_id('A.disabled') = ANY (v_out.must_act_user_ids)) AND NOT (tests.user_id('B.admin') = ANY (v_out.must_act_user_ids)),
+                   'notifications: but no crew member, not the applicant, no inactive user and nobody of another company');
 END
 $$;
 -- Emits that fail are warnings: a type the outbox does not know is skipped.

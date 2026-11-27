@@ -6,7 +6,8 @@
 --   storage.objects policies documents_bucket_select / _insert / _update /
 --   _delete replace the four legacy policies of 20260125163105
 -- Helpers: storage_object_company(), storage_crew_document_path(),
---   storage_crew_document_allowed()
+--   storage_crew_document_allowed(text, text) (action-aware; the
+--   (text, boolean) form of the first version is dropped, D-373)
 -- TS mirror: src/lib/storage/crewDocuments.ts (uploadCrewDocumentFile,
 --   buildCrewDocumentFilePath, CREW_DOCUMENT_MAX_BYTES,
 --   CREW_DOCUMENT_MIME_TYPES); the MIME list equals
@@ -15,17 +16,42 @@
 --
 -- Why. The documents bucket was created by the Lovable copy 20260125163105
 -- with four policies that let every member of a company read, overwrite
--- and delete every object under <company>/…, so a crew member's passport
--- or medical certificate would be open to the whole company. X1 stores crew
--- documents (keyed on profiles.id, since most crew have no login) under
---   <company_id>/crew/<profile_id>/documents/<uuid>-<safe name>
--- and that prefix is now readable only when X1's predicate
--- crew_document_file_readable(user, profile) answers true, and writable
--- (insert, update, delete) only when crew_document_file_writable(user,
--- profile) does. Both are X1-04's (block 06, frozen signatures). Until
--- they are in the database the prefix is closed to everyone but the
--- service role: storage_crew_document_allowed finds them through
--- to_regprocedure and denies when they are missing.
+-- and delete every object under <company>/…, so a crew member's passport,
+-- payslip or disciplinary file was open to the whole company. Everything
+-- under <company>/crew/ is personal data (D-373, amending D-322): the
+-- company rule covers only the other prefixes, and every crew/ name goes
+-- through the action-aware gate storage_crew_document_allowed(name,
+-- action), action one of read, insert, update, delete.
+--
+-- Crew paths. Two writers use the crew/ prefix:
+--   <company_id>/crew/<profile_id>/documents/<uuid>-<safe name>   (X1)
+--   <company_id>/crew/<user_id or profile_id>/<kind>/<file>       (legacy
+--     uploadCrewDocument: kind one of certificates, attachments,
+--     contracts, next-of-kin, evaluations, disciplinary, payslips,
+--     right-to-work, recruitment, onboarding; usePayroll writes
+--     crew_user_id ?? profile_id, so segment 3 is a login id or a profile id)
+-- The gate checks the shape (exactly five segments, canonical lower-case
+-- uuids in segments 1 and 3, a safe file name, no '..'), that the caller is
+-- active and a member of that company, and resolves the subject as the
+-- profile of that company whose id or login id is segment 3 (none -> deny).
+-- Then, by kind (D-373):
+--   documents, certificates, attachments   X1's crew_document_file_readable
+--     (read) / crew_document_file_writable (insert, update, delete) for the
+--     subject's profile, found through to_regprocedure (missing -> deny):
+--     the subject, the vessel's document readers and editors, HR;
+--   contracts, payslips, disciplinary, evaluations   read: the subject or
+--     an HR viewer (hr_can_view); write: an HR editor (hr_can_edit). Payslips
+--     also the payroll readers / editors (payroll_can_view / _edit, whose
+--     page writes them); evaluations also the reviewer of one of the
+--     subject's reviews (the performance_reviews write rule:
+--     reviewer_profile_id = my_profile_id()). The subject never replaces or
+--     deletes these;
+--   right-to-work, next-of-kin, onboarding   read: the subject or an HR
+--     viewer; insert: an HR editor or the subject (a new object only:
+--     crew upload their own evidence); update, delete: an HR editor;
+--   recruitment   read: an HR viewer; write: an HR editor;
+--   anything else   denied (fail closed).
+-- Without a JWT nothing matches; the service role bypasses RLS.
 --
 -- Every other prefix behaves as before: a signed-in member of the company
 -- named by the first folder reads, uploads, updates and deletes. The
@@ -34,18 +60,10 @@
 -- nothing; the new policies say the same through user_belongs_to_company
 -- (active-aware), as the build-out rules require (rule 15: no inline
 -- profiles subquery). The legacy policies had no role list (PUBLIC); anon
--- never matched (no auth.uid()), so TO authenticated changes nothing.
---
--- The prefix cannot collide with today's crew files. The legacy writer
--- (uploadCrewDocument, src/lib/storage/crewDocuments.ts) writes
--- <company>/crew/<user_id>/<kind>/… with kind one of certificates,
--- attachments, contracts, next-of-kin, evaluations, disciplinary,
--- payslips, right-to-work, recruitment, onboarding; never 'documents'.
--- The other writers to this bucket use <company>/<file>,
--- <company>/recruitment/… and form-templates/…. Any name whose second
--- segment is 'crew' and fourth 'documents' is treated as the prefix (fail
--- closed: a malformed one is denied, never left to the company rule).
---
+-- never matched (no auth.uid()), so TO authenticated changes nothing. The
+-- other writers to this bucket use <company>/<file>,
+-- <company>/recruitment/… and form-templates/….
+
 -- Bucket limits. file_size_limit 25 MB -> 50 MB (gap/08 UP1; C25).
 -- allowed_mime_types: the five legacy types (PDF, DOCX, XLSX, PNG, JPEG)
 -- become the UP1 list (adds WebP, HEIC, HEIF, GIF, DOC, XLS). Every
@@ -114,9 +132,10 @@ BEGIN
 END;
 $$;
 
--- True for any name under the crew-documents prefix: second segment
--- 'crew' and fourth 'documents' (<company>/crew/<profile>/documents/…),
--- whatever the rest looks like. Pure.
+-- True for any name whose second segment is 'crew' (<company>/crew/…):
+-- the personal-data prefix the gate decides, whatever the rest looks like
+-- (a malformed name included, so it is denied, never left to the company
+-- rule; D-373). The function keeps its first name. Pure.
 CREATE OR REPLACE FUNCTION public.storage_crew_document_path(p_name text)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -124,23 +143,32 @@ IMMUTABLE
 SET search_path = public
 AS $$
 BEGIN
-  RETURN split_part(coalesce(p_name, ''), '/', 2) = 'crew' AND split_part(coalesce(p_name, ''), '/', 4) = 'documents';
+  RETURN split_part(coalesce(p_name, ''), '/', 2) = 'crew';
 END;
 $$;
 
--- ---------------------------------------------------------------- the crew-document gate
+-- ---------------------------------------------------------------- the crew-files gate
 
--- Read (p_for_write false) or write (true) access to one object under
--- <company_id>/crew/<profile_id>/documents/<uuid>-<safe name>, for
--- auth.uid(): exactly five segments, canonical lower-case uuids, the file
--- segment <uuid>-<name> with the UP1 safe-name rule, no '..'; the caller
--- an active member of the company; the profile a profile of that company;
--- then X1's predicate (crew_document_file_readable or
--- crew_document_file_writable, (user uuid, profile uuid) -> boolean),
+-- Access of auth.uid() to one object under <company>/crew/, for p_action
+-- read, insert, update or delete (the rules by kind are in the header,
+-- D-373). Shape: exactly five segments, canonical lower-case uuids in
+-- segments 1 and 3, no '..'; the X1 file segment <uuid>-<safe name> under
+-- documents/, a safe name elsewhere. The caller active and a member of the
+-- company; the subject the profile of that company whose id or login id is
+-- segment 3. X1's predicates (crew_document_file_readable /
+-- crew_document_file_writable, (user uuid, profile uuid) -> boolean) are
 -- called only when to_regprocedure finds that exact signature. No caller,
--- a malformed name, a foreign company or profile, a missing predicate or a
--- NULL answer -> false (fail closed).
-CREATE OR REPLACE FUNCTION public.storage_crew_document_allowed(p_name text, p_for_write boolean)
+-- an unknown action or kind, a malformed name, a foreign company or
+-- subject, a missing predicate or a NULL answer -> false (fail closed).
+-- The first version's (text, boolean) form is dropped below, before the
+-- policies are recreated.
+DROP POLICY IF EXISTS documents_bucket_select ON storage.objects;
+DROP POLICY IF EXISTS documents_bucket_insert ON storage.objects;
+DROP POLICY IF EXISTS documents_bucket_update ON storage.objects;
+DROP POLICY IF EXISTS documents_bucket_delete ON storage.objects;
+DROP FUNCTION IF EXISTS public.storage_crew_document_allowed(text, boolean);
+
+CREATE OR REPLACE FUNCTION public.storage_crew_document_allowed(p_name text, p_action text)
 RETURNS boolean
 LANGUAGE plpgsql
 STABLE
@@ -151,12 +179,17 @@ DECLARE
   v_uid uuid := auth.uid();
   v_parts text[];
   v_uuid constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
-  v_file constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[A-Za-z0-9][A-Za-z0-9._-]{0,199}$';
+  v_x1_file constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[A-Za-z0-9][A-Za-z0-9._-]{0,199}$';
+  v_file constant text := '^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$';
   v_company uuid;
+  v_kind text;
   v_profile uuid;
+  v_subject_user uuid;
+  v_read boolean := p_action = 'read';
   v_allowed boolean;
 BEGIN
-  IF v_uid IS NULL OR p_name IS NULL OR p_for_write IS NULL OR length(p_name) > 512 OR position('..' IN p_name) > 0 THEN
+  IF v_uid IS NULL OR p_name IS NULL OR p_action IS NULL OR p_action NOT IN ('read', 'insert', 'update', 'delete')
+     OR length(p_name) > 512 OR position('..' IN p_name) > 0 THEN
     RETURN false;
   END IF;
   v_parts := string_to_array(p_name, '/');
@@ -164,30 +197,68 @@ BEGIN
      OR v_parts[1] !~ v_uuid
      OR v_parts[2] <> 'crew'
      OR v_parts[3] !~ v_uuid
-     OR v_parts[4] <> 'documents'
-     OR v_parts[5] !~ v_file THEN
+     OR (v_parts[4] = 'documents' AND v_parts[5] !~ v_x1_file)
+     OR (v_parts[4] IS DISTINCT FROM 'documents' AND v_parts[5] !~ v_file) THEN
     RETURN false;
   END IF;
   v_company := v_parts[1]::uuid;
-  v_profile := v_parts[3]::uuid;
-  IF NOT public.user_is_active(v_uid) OR NOT public.user_belongs_to_company(v_uid, v_company) THEN
+  v_kind := v_parts[4];
+  IF NOT coalesce(public.user_is_active(v_uid), false) OR NOT coalesce(public.user_belongs_to_company(v_uid, v_company), false) THEN
     RETURN false;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.profiles AS p WHERE p.id = v_profile AND p.company_id = v_company) THEN
+  SELECT p.id, p.user_id INTO v_profile, v_subject_user
+  FROM public.profiles AS p
+  WHERE p.company_id = v_company AND (p.id = v_parts[3]::uuid OR p.user_id = v_parts[3]::uuid)
+  ORDER BY (p.id = v_parts[3]::uuid) DESC
+  LIMIT 1;
+  IF v_profile IS NULL THEN
     RETURN false;
   END IF;
-  IF p_for_write THEN
-    IF to_regprocedure('public.crew_document_file_writable(uuid,uuid)') IS NULL THEN
-      RETURN false;
+
+  IF v_kind IN ('documents', 'certificates', 'attachments') THEN
+    IF v_read THEN
+      IF to_regprocedure('public.crew_document_file_readable(uuid,uuid)') IS NULL THEN
+        RETURN false;
+      END IF;
+      EXECUTE 'SELECT public.crew_document_file_readable($1, $2)' INTO v_allowed USING v_uid, v_profile;
+    ELSE
+      IF to_regprocedure('public.crew_document_file_writable(uuid,uuid)') IS NULL THEN
+        RETURN false;
+      END IF;
+      EXECUTE 'SELECT public.crew_document_file_writable($1, $2)' INTO v_allowed USING v_uid, v_profile;
     END IF;
-    EXECUTE 'SELECT public.crew_document_file_writable($1, $2)' INTO v_allowed USING v_uid, v_profile;
-  ELSE
-    IF to_regprocedure('public.crew_document_file_readable(uuid,uuid)') IS NULL THEN
-      RETURN false;
-    END IF;
-    EXECUTE 'SELECT public.crew_document_file_readable($1, $2)' INTO v_allowed USING v_uid, v_profile;
+    RETURN coalesce(v_allowed, false);
   END IF;
-  RETURN coalesce(v_allowed, false);
+
+  IF v_kind IN ('contracts', 'payslips', 'disciplinary', 'evaluations') THEN
+    IF v_read THEN
+      RETURN (v_subject_user IS NOT NULL AND v_subject_user = v_uid)
+          OR coalesce(public.hr_can_view(v_uid), false)
+          OR (v_kind = 'payslips' AND coalesce(public.payroll_can_view(v_uid), false))
+          OR (v_kind = 'evaluations' AND EXISTS (
+                SELECT 1 FROM public.performance_reviews AS r
+                WHERE r.profile_id = v_profile AND r.company_id = v_company AND r.reviewer_profile_id = public.my_profile_id()));
+    END IF;
+    RETURN coalesce(public.hr_can_edit(v_uid), false)
+        OR (v_kind = 'payslips' AND coalesce(public.payroll_can_edit(v_uid), false))
+        OR (v_kind = 'evaluations' AND EXISTS (
+              SELECT 1 FROM public.performance_reviews AS r
+              WHERE r.profile_id = v_profile AND r.company_id = v_company AND r.reviewer_profile_id = public.my_profile_id()));
+  END IF;
+
+  IF v_kind IN ('right-to-work', 'next-of-kin', 'onboarding') THEN
+    IF v_read THEN
+      RETURN (v_subject_user IS NOT NULL AND v_subject_user = v_uid) OR coalesce(public.hr_can_view(v_uid), false);
+    END IF;
+    RETURN coalesce(public.hr_can_edit(v_uid), false)
+        OR (p_action = 'insert' AND v_subject_user IS NOT NULL AND v_subject_user = v_uid);
+  END IF;
+
+  IF v_kind = 'recruitment' THEN
+    RETURN CASE WHEN v_read THEN coalesce(public.hr_can_view(v_uid), false) ELSE coalesce(public.hr_can_edit(v_uid), false) END;
+  END IF;
+
+  RETURN false;
 END;
 $$;
 
@@ -199,15 +270,16 @@ DROP POLICY IF EXISTS "Users can upload documents to their company" ON storage.o
 DROP POLICY IF EXISTS "Users can update documents in their company" ON storage.objects;
 DROP POLICY IF EXISTS "Users can delete documents in their company" ON storage.objects;
 
--- An active member of the company named by the first folder; under the
--- crew-documents prefix also X1's predicate (through the gate).
+-- An active member of the company named by the first folder; under
+-- <company>/crew/ also the gate, per action (D-373). UPDATE asks the gate
+-- for the old name (USING) and the new one (WITH CHECK).
 DROP POLICY IF EXISTS documents_bucket_select ON storage.objects;
 CREATE POLICY documents_bucket_select ON storage.objects
   FOR SELECT TO authenticated
   USING (
     bucket_id = 'documents'
     AND public.user_belongs_to_company((SELECT auth.uid()), public.storage_object_company(name))
-    AND (NOT public.storage_crew_document_path(name) OR public.storage_crew_document_allowed(name, false))
+    AND (split_part(name, '/', 2) <> 'crew' OR public.storage_crew_document_allowed(name, 'read'))
   );
 
 DROP POLICY IF EXISTS documents_bucket_insert ON storage.objects;
@@ -216,7 +288,7 @@ CREATE POLICY documents_bucket_insert ON storage.objects
   WITH CHECK (
     bucket_id = 'documents'
     AND public.user_belongs_to_company((SELECT auth.uid()), public.storage_object_company(name))
-    AND (NOT public.storage_crew_document_path(name) OR public.storage_crew_document_allowed(name, true))
+    AND (split_part(name, '/', 2) <> 'crew' OR public.storage_crew_document_allowed(name, 'insert'))
   );
 
 DROP POLICY IF EXISTS documents_bucket_update ON storage.objects;
@@ -225,12 +297,12 @@ CREATE POLICY documents_bucket_update ON storage.objects
   USING (
     bucket_id = 'documents'
     AND public.user_belongs_to_company((SELECT auth.uid()), public.storage_object_company(name))
-    AND (NOT public.storage_crew_document_path(name) OR public.storage_crew_document_allowed(name, true))
+    AND (split_part(name, '/', 2) <> 'crew' OR public.storage_crew_document_allowed(name, 'update'))
   )
   WITH CHECK (
     bucket_id = 'documents'
     AND public.user_belongs_to_company((SELECT auth.uid()), public.storage_object_company(name))
-    AND (NOT public.storage_crew_document_path(name) OR public.storage_crew_document_allowed(name, true))
+    AND (split_part(name, '/', 2) <> 'crew' OR public.storage_crew_document_allowed(name, 'update'))
   );
 
 DROP POLICY IF EXISTS documents_bucket_delete ON storage.objects;
@@ -239,24 +311,27 @@ CREATE POLICY documents_bucket_delete ON storage.objects
   USING (
     bucket_id = 'documents'
     AND public.user_belongs_to_company((SELECT auth.uid()), public.storage_object_company(name))
-    AND (NOT public.storage_crew_document_path(name) OR public.storage_crew_document_allowed(name, true))
+    AND (split_part(name, '/', 2) <> 'crew' OR public.storage_crew_document_allowed(name, 'delete'))
   );
 
 -- ---------------------------------------------------------------- privileges (rule 5)
 
--- The policies run as the caller, so authenticated executes the three
--- helpers (the two pure ones reveal nothing; the gate answers only for
--- auth.uid()). The service role bypasses RLS and may call them to check a path.
+-- The policies run as the caller, so authenticated must execute the three
+-- helpers (a storage policy cannot call a function its caller may not
+-- execute): the two pure ones reveal nothing, and the gate answers only for
+-- auth.uid() (it is no browser RPC; nothing in the client calls it). anon
+-- and PUBLIC execute none. The service role bypasses RLS and may call them
+-- to check a path.
 REVOKE ALL ON FUNCTION public.storage_object_company(text) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.storage_crew_document_path(text) FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.storage_crew_document_allowed(text, boolean) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.storage_crew_document_allowed(text, text) FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.storage_object_company(text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.storage_crew_document_path(text) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.storage_crew_document_allowed(text, boolean) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.storage_crew_document_allowed(text, text) TO authenticated, service_role;
 
 -- ---------------------------------------------------------------- comments
 
 COMMENT ON FUNCTION public.storage_object_company(text) IS 'The company of a storage object name: its first folder when that is a canonical lower-case uuid, else NULL (the documents-bucket company rule; pure).';
-COMMENT ON FUNCTION public.storage_crew_document_path(text) IS 'True for a documents-bucket name under the crew-documents prefix <company>/crew/<profile>/documents/ (second segment crew, fourth documents; malformed names included, so they are denied by the gate, never left to the company rule). Pure.';
-COMMENT ON FUNCTION public.storage_crew_document_allowed(text, boolean) IS 'The crew-document gate of the documents bucket (PR-X1-F, D-X1-18) for auth.uid(): <company>/crew/<profile_id>/documents/<uuid>-<safe name>, an active member of the company, the profile in that company, then X1''s crew_document_file_readable (read) or crew_document_file_writable (insert, update, delete) when to_regprocedure finds it; missing predicate or anything unknown -> false.';
+COMMENT ON FUNCTION public.storage_crew_document_path(text) IS 'True for a documents-bucket name whose second segment is crew (<company>/crew/…): the personal-data prefix the gate decides, malformed names included, so they are denied, never left to the company rule (D-373). Pure.';
+COMMENT ON FUNCTION public.storage_crew_document_allowed(text, text) IS 'The crew-files gate of the documents bucket (D-373, amending D-322) for auth.uid() and an action (read, insert, update, delete): <company>/crew/<profile or login id>/<kind>/<file>, five segments, no ..; an active member of the company; the subject the profile of that company with that id or login id. documents, certificates, attachments: X1''s crew_document_file_readable / _writable when to_regprocedure finds them; contracts, payslips, disciplinary, evaluations: read the subject or HR viewers (payslips also payroll viewers, evaluations also the subject''s reviewers), write HR editors (payslips also payroll editors, evaluations also the reviewers); right-to-work, next-of-kin, onboarding: read the subject or HR viewers, insert HR editors or the subject, update / delete HR editors; recruitment: HR; anything else, a missing predicate or an unknown id -> false.';
