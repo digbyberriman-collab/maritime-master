@@ -11,6 +11,7 @@ import { useTraining } from '@/modules/training/hooks/useTraining';
 import { useVessels } from '@/modules/vessels/hooks/useVessels';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { DEFAULT_FAMILIARIZATION_SECTIONS } from '@/modules/training/constants';
+import { checklistItemsFromSections, groupBySection } from '@/modules/crew/lib/familiarisation';
 import { 
   Plus, 
   FileText, 
@@ -69,7 +70,11 @@ const FamiliarizationTemplatesModal: React.FC<FamiliarizationTemplatesModalProps
       template_name: formData.template_name,
       total_duration_days: formData.total_duration_days,
       applicable_ranks: formData.applicable_ranks,
-      sections: formData.sections as any,
+      sections: formData.sections.map((section) => ({
+        section_name: section.section_name,
+        required_days: section.required_days,
+        checklist_items: [...section.checklist_items],
+      })),
       created_by: profile?.user_id,
       is_active: true,
     });
@@ -206,7 +211,8 @@ const FamiliarizationTemplatesModal: React.FC<FamiliarizationTemplatesModalProps
             ) : (
               templates.map(template => {
                 const isExpanded = expandedTemplate === template.id;
-                const sections = template.sections as any[];
+                // Read leniently (legacy rows): the sections as the record page groups them.
+                const sections = groupBySection(checklistItemsFromSections(template.sections));
 
                 return (
                   <Collapsible
@@ -227,7 +233,7 @@ const FamiliarizationTemplatesModal: React.FC<FamiliarizationTemplatesModalProps
                               <div>
                                 <CardTitle className="text-lg">{template.template_name}</CardTitle>
                                 <p className="text-sm text-muted-foreground">
-                                  {template.total_duration_days} days • {sections?.length || 0} sections
+                                  {template.total_duration_days} days • {sections.length} sections
                                 </p>
                               </div>
                             </div>
@@ -244,19 +250,19 @@ const FamiliarizationTemplatesModal: React.FC<FamiliarizationTemplatesModalProps
                       </CollapsibleTrigger>
                       <CollapsibleContent>
                         <CardContent>
-                          {sections?.map((section: any, index: number) => (
+                          {sections.map((section, index) => (
                             <div key={index} className="mb-3 last:mb-0">
-                              <h4 className="font-medium text-sm">{section.section_name}</h4>
+                              <h4 className="font-medium text-sm">{section.name}</h4>
                               <ul className="mt-1 space-y-1">
-                                {section.checklist_items?.slice(0, 3).map((item: string, i: number) => (
+                                {section.items.slice(0, 3).map((item, i) => (
                                   <li key={i} className="text-sm text-muted-foreground flex items-center gap-2">
                                     <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                                    {item}
+                                    {item.item_text}
                                   </li>
                                 ))}
-                                {section.checklist_items?.length > 3 && (
+                                {section.items.length > 3 && (
                                   <li className="text-sm text-muted-foreground italic">
-                                    +{section.checklist_items.length - 3} more items
+                                    +{section.items.length - 3} more items
                                   </li>
                                 )}
                               </ul>

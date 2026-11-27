@@ -1,0 +1,164 @@
+[
+  {
+    "id": "f1000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": null,
+    "scope": "fleet",
+    "code": "FAM-2026-001",
+    "variant_of": null,
+    "template_name": "24-hour safety familiarisation",
+    "description": "What every person on board needs to know before taking up duties.",
+    "due_within_days": 1,
+    "total_duration_days": 1,
+    "requires_crew_signature": true,
+    "requires_supervisor_signature": true,
+    "sections": [
+      {
+        "section_name": "Alarms and muster",
+        "checklist_items": [
+          "Recognise the general emergency alarm and the fire alarm",
+          "Find your muster station and your lifejacket",
+          "Know your duties on the muster list",
+          "Know how to raise the alarm for a fire, a person overboard or flooding"
+        ]
+      },
+      {
+        "section_name": "Escape and life-saving equipment",
+        "checklist_items": [
+          "Walk the escape routes from your cabin and your place of work",
+          "Locate the liferafts, the rescue boat and the tender stations",
+          "Locate lifebuoys, immersion suits and emergency escape breathing devices"
+        ]
+      },
+      {
+        "section_name": "Fire-fighting and first aid",
+        "checklist_items": [
+          "Locate the fire extinguishers and fire stations near your work and cabin",
+          "Locate the first-aid kits and the medical locker",
+          "Know where the emergency stops and fire dampers are"
+        ]
+      }
+    ],
+    "applicable_ranks": [],
+    "is_active": true,
+    "form_template_id": null,
+    "created_by": "a0000000-0000-4000-8000-000000000001",
+    "updated_by": "a0000000-0000-4000-8000-000000000001",
+    "created_at": "$ts:-60d",
+    "updated_at": "$ts:-20d"
+  },
+  {
+    "id": "f1000000-0000-4000-8000-000000000002",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "scope": "vessel",
+    "code": "FAM-DRA-2026-001",
+    "variant_of": null,
+    "template_name": "Two-week vessel familiarisation",
+    "description": "The vessel, its routines and your department, with your head of department.",
+    "due_within_days": 14,
+    "total_duration_days": 14,
+    "requires_crew_signature": true,
+    "requires_supervisor_signature": true,
+    "sections": [
+      {
+        "section_name": "The vessel",
+        "checklist_items": [
+          "Tour of the bridge, engine room, crew areas and guest areas",
+          "General arrangement and fire-control plans",
+          "Watertight doors: where they are and how they close"
+        ]
+      },
+      {
+        "section_name": "Operations",
+        "checklist_items": [
+          "Watchkeeping and handover routine",
+          "Radios, telephones and the public address system",
+          "Mooring, anchoring and passerelle operations"
+        ]
+      },
+      {
+        "section_name": "Safety management",
+        "checklist_items": [
+          "The safety management system and where to find it",
+          "Reporting a near miss, an incident or a non-conformity"
+        ]
+      }
+    ],
+    "applicable_ranks": [],
+    "is_active": true,
+    "form_template_id": null,
+    "created_by": "a0000000-0000-4000-8000-000000000001",
+    "updated_by": "a0000000-0000-4000-8000-000000000001",
+    "created_at": "$ts:-50d",
+    "updated_at": "$ts:-10d"
+  },
+  {
+    "id": "f1000000-0000-4000-8000-000000000003",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "scope": "vessel",
+    "code": "FAM-DRA-2026-002",
+    "variant_of": null,
+    "template_name": "Interior service familiarisation",
+    "description": null,
+    "due_within_days": 7,
+    "total_duration_days": 7,
+    "requires_crew_signature": true,
+    "requires_supervisor_signature": true,
+    "sections": [
+      {
+        "section_name": "Guest areas",
+        "checklist_items": [
+          "Guest cabin layout and turndown routine",
+          "Pantry and service stations",
+          "Linen and laundry rota"
+        ]
+      },
+      {
+        "section_name": "Safety in the interior",
+        "checklist_items": [
+          "Galley fire blanket and gas shut-off",
+          "Chemical storage and safety data sheets"
+        ]
+      }
+    ],
+    "applicable_ranks": [],
+    "is_active": true,
+    "form_template_id": null,
+    "created_by": "a0000000-0000-4000-8000-000000000001",
+    "updated_by": "a0000000-0000-4000-8000-000000000001",
+    "created_at": "$ts:-40d",
+    "updated_at": "$ts:-5d"
+  },
+  {
+    "id": "f1000000-0000-4000-8000-000000000004",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "scope": "vessel",
+    "code": "FAM-DRA-2025-001",
+    "variant_of": null,
+    "template_name": "Galley checklist (old)",
+    "description": null,
+    "due_within_days": 14,
+    "total_duration_days": 14,
+    "requires_crew_signature": false,
+    "requires_supervisor_signature": true,
+    "sections": [
+      {
+        "section_name": "Checklist",
+        "checklist_items": [
+          "Galley tour",
+          "Cold store alarm"
+        ]
+      }
+    ],
+    "applicable_ranks": [],
+    "is_active": false,
+    "form_template_id": null,
+    "created_by": "a0000000-0000-4000-8000-000000000001",
+    "updated_by": "a0000000-0000-4000-8000-000000000001",
+    "created_at": "$ts:-400d",
+    "updated_at": "$ts:-200d"
+  }
+]

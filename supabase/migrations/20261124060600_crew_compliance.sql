@@ -87,10 +87,10 @@
 --     combined basic safety certificate, not linked"), 'none'; the nearest
 --     document is named. Every met cell names its document and the rule.
 -- A familiarisation row (C36) is met by a completed familiarization_records
--- row of one of its templates on the vessel, keyed on the person's login
--- today; X1-10 (20261124061000, which adds familiarization_records.profile_id)
--- edits this file in place to accept the profile id too (rule §0.2). An open
--- record reads 'in_progress'.
+-- row of one of its templates on the vessel, matched on the person's
+-- profile or their login (X1-10, 20261124061000, edited this file in place
+-- for the profile and for fleet-wide templates, rule §0.2; people without a
+-- login hold records by profile only). An open record reads 'in_progress'.
 --
 -- The tab of a row: familiarisation for a familiarisation row, else the tab
 -- of its first option's category (T-185: the tab belongs to the type),
@@ -284,6 +284,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS crew_document_type_satisfies_scope_pair_key
 -- The engine's document lookups (gap/04 implementation notes, performance).
 CREATE INDEX IF NOT EXISTS crew_certificates_profile_document_type_idx ON public.crew_certificates (profile_id, document_type_id) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS familiarization_records_vessel_template_idx ON public.familiarization_records (vessel_id, template_id, user_id);
+-- The two columns the engine below reads, added bare (X1-10's
+-- 20261124061000 owns them: their FKs, backfill and CHECKs). Here because
+-- the SQL functions of this file are checked when they are created, and a
+-- later file may not redefine them (rule §0.2).
+ALTER TABLE public.familiarization_records ADD COLUMN IF NOT EXISTS profile_id uuid NULL;
+ALTER TABLE public.familiarization_templates ADD COLUMN IF NOT EXISTS company_id uuid NULL;
 
 -- ---------------------------------------------------------------- integrity guards (every writer, the service role included)
 
@@ -363,10 +369,12 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'crew_requirement_type_scope_mismatch',
       DETAIL = 'A requirement names document types of STORM or its own company.';
   END IF;
+  -- A vessel template of the company, or a fleet-wide one (vessel_id NULL,
+  -- company_id set; X1-10).
   IF NEW.familiarization_template_id IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM public.familiarization_templates AS ft
-    JOIN public.vessels AS v ON v.id = ft.vessel_id
-    WHERE ft.id = NEW.familiarization_template_id AND v.company_id = v_row.company_id
+    LEFT JOIN public.vessels AS v ON v.id = ft.vessel_id
+    WHERE ft.id = NEW.familiarization_template_id AND coalesce(v.company_id, ft.company_id) = v_row.company_id
   ) THEN
     RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'crew_requirement_template_scope_mismatch',
       DETAIL = 'A requirement names familiarisation templates of its own company.';
@@ -763,7 +771,8 @@ AS $$
     FROM req AS q
     JOIN opt AS o ON o.row_id = q.row_id AND o.familiarization_template_id IS NOT NULL
     JOIN public.familiarization_records AS fr
-      ON fr.template_id = o.familiarization_template_id AND fr.vessel_id = q.vessel_id AND fr.user_id = q.user_id
+      ON fr.template_id = o.familiarization_template_id AND fr.vessel_id = q.vessel_id
+     AND (fr.profile_id = q.profile_id OR fr.user_id = q.user_id)
     JOIN public.familiarization_templates AS ft ON ft.id = fr.template_id
     WHERE q.kind = 'familiarisation'
     ORDER BY q.vessel_id, q.profile_id, q.row_id, coalesce(lower(fr.status) = 'completed', false) DESC,
@@ -1002,7 +1011,7 @@ AS $$
     SELECT o.row_id, mem.profile_id
     FROM public.crew_requirement_options AS o
     JOIN public.familiarization_records AS fr ON fr.template_id = o.familiarization_template_id AND fr.vessel_id = p_vessel_id
-    JOIN mem ON mem.user_id = fr.user_id
+    JOIN mem ON (mem.profile_id = fr.profile_id OR mem.user_id = fr.user_id)
     WHERE o.vessel_id = p_vessel_id AND o.familiarization_template_id IS NOT NULL
       AND lower(fr.status) = 'completed'
   )
@@ -1273,7 +1282,7 @@ BEGIN
                             ORDER BY ft.is_active DESC, ft.template_name, ft.id), '[]'::jsonb)
     INTO v_templates
   FROM public.familiarization_templates AS ft
-  WHERE ft.vessel_id = p_vessel_id;
+  WHERE ft.vessel_id = p_vessel_id OR (ft.vessel_id IS NULL AND ft.company_id = v_company);
 
   RETURN jsonb_build_object(
     'vessel_id', p_vessel_id,

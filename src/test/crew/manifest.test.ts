@@ -41,6 +41,8 @@ const PROFILE_PATH = 'crew/people/:profileId';
 /** Crew Compliance (X1-06B). */
 const COMPLIANCE_TAB_PATH = `${CREW_PATHS.compliance}/:tab`;
 const PROFILE_TAB_PATH = 'crew/people/:profileId/:tab';
+/** One familiarisation record (X1-10). */
+const FAM_RECORD_PATH = `${CREW_PATHS.familiarisation}/:recordId`;
 const catalogue = new Set(listCatalogueCapabilities());
 
 /** Today's page for each crew path (PP3's pure move; X1-02 rebuilt the list and folded the roster in). */
@@ -55,7 +57,9 @@ const TODAY: Record<string, string> = {
   // X1-07B: one crew member's month is the profile's Hours of rest tab (crew/people/:profileId/:tab); no route of its own.
   // X1-09B: the planner's tabs on one page (the three legacy pages are its D-01 fallback and their legacy URLs' wrappers).
   [`vessel ${PLANNER_TAB_PATH}`]: '/src/modules/rotation-planner/pages/PlannerPage.tsx',
-  [`vessel ${CREW_PATHS.familiarisation}`]: '/src/modules/training/pages/Training.tsx',
+  // X1-10: familiarisation per vessel and position (the legacy Training tab is its D-01 fallback), and one record.
+  [`vessel ${CREW_PATHS.familiarisation}`]: '/src/modules/crew/pages/FamiliarisationPage.tsx',
+  [`vessel ${FAM_RECORD_PATH}`]: '/src/modules/crew/pages/FamiliarisationRecordPage.tsx',
   // X1-09B: the fleet planner is the same page in fleet scope (?tab=crew).
   [`fleet ${CREW_FLEET_PATHS.planner}`]: '/src/modules/rotation-planner/pages/PlannerPage.tsx',
   // X1-03: the routed crew profile (new; gated in the page and on the server).
@@ -84,7 +88,8 @@ describe('crew routes', () => {
   it('keeps today\'s guard on every moved page (ProtectedRoute, as the old protectedPage); the rebuilt list is behind its capability', () => {
     for (const r of pages) {
       if (r.path === CREW_PATHS.list) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.crewListView });
-      else if (r.path === PROFILE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'scope' });
+      else if (r.path === PROFILE_TAB_PATH || r.path === FAM_RECORD_PATH) expect(r.guard, r.path).toEqual({ kind: 'scope' });
+      else if (r.path === CREW_PATHS.familiarisation) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.famView });
       else if (r.path === ADD_CREW_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.profilesCreate });
       else if (r.path === COMPLIANCE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.complianceView });
       else if (r.path === CREW_PATHS.hoursOfRest) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.horApprove });
@@ -163,7 +168,8 @@ describe('every vessel crew URL of today resolves to its page', () => {
     ['/v/dra/crew/planner/requests', 'rotation-planner/pages/PlannerPage.tsx'],
     ['/v/dra/crew/planner/configuration', 'rotation-planner/pages/PlannerPage.tsx'],
     ['/v/dra/crew/training', 'development/pages/CrewTraining.tsx'],
-    ['/v/dra/crew/familiarisation', 'training/pages/Training.tsx'],
+    ['/v/dra/crew/familiarisation', 'crew/pages/FamiliarisationPage.tsx'],
+    ['/v/dra/crew/familiarisation/rec-1', 'crew/pages/FamiliarisationRecordPage.tsx'],
     ['/fleet/planner', 'rotation-planner/pages/PlannerPage.tsx'],
     // X1-03: the routed profile.
     ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015', 'crew/pages/CrewProfilePage.tsx'],
@@ -232,12 +238,9 @@ describe('crew nav', () => {
     expect(byLabel('Crew Compliance').capability).toBe(CREW_CAPS.complianceView);
   });
 
-  it('moved leaves keep live and today\'s gates (no capability until their page is rebuilt, D-X1-25)', () => {
-    for (const label of ['Familiarisation']) {
-      const node = byLabel(label);
-      expect(node.status, label).toBe('live');
-      expect(node.capability, label).toBeUndefined();
-    }
+  it('the rebuilt Familiarisation is beta behind vessel.crew.familiarisation.view (X1-10); every moved leaf is rebuilt now', () => {
+    expect(byLabel('Familiarisation').status).toBe('beta');
+    expect(byLabel('Familiarisation').capability).toBe(CREW_CAPS.famView);
   });
 
   it('the rebuilt Planner is beta behind vessel.crew.crew_scheduling.view, labelled by the vessel\'s planner setting (X1-09B)', () => {

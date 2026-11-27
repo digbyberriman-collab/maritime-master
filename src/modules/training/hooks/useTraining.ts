@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { mapLegacyStatus } from '@/modules/crew/lib/familiarisation';
 
 export type TrainingCourse = Tables<'training_courses'>;
 export type TrainingRecord = Tables<'training_records'> & {
@@ -18,6 +19,20 @@ export type FamiliarizationRecord = Tables<'familiarization_records'> & {
 };
 export type FamiliarizationChecklistItem = Tables<'familiarization_checklist_items'>;
 export type TrainingMatrix = Tables<'training_matrix'>;
+
+/** A familiarisation still to finish, in the legacy or the X1-10 status vocabulary. */
+export function isActiveFamiliarisation(status: string | null | undefined): boolean {
+  const mapped = mapLegacyStatus(status);
+  return mapped === 'open' || mapped === 'in_progress' || mapped === 'awaiting_signatures';
+}
+
+/** True when a date-only due date is before today (the viewer's calendar). */
+function isPastDue(due: string | null | undefined): boolean {
+  if (!due) return false;
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return due.slice(0, 10) < today;
+}
 
 export function useTraining() {
   const queryClient = useQueryClient();
@@ -320,8 +335,9 @@ export function useTraining() {
     validRecords: trainingRecords.filter(r => r.status === 'Valid').length,
     expiringSoon: trainingRecords.filter(r => r.status === 'Expiring_Soon').length,
     expired: trainingRecords.filter(r => r.status === 'Expired').length,
-    activeFamiliarizations: familiarizationRecords.filter(r => r.status === 'In_Progress').length,
-    overdueFamiliarizations: familiarizationRecords.filter(r => r.status === 'Overdue').length,
+    // Both vocabularies (X1-10): the legacy In_Progress / Overdue and the new open / in_progress / awaiting_signatures.
+    activeFamiliarizations: familiarizationRecords.filter(r => isActiveFamiliarisation(r.status)).length,
+    overdueFamiliarizations: familiarizationRecords.filter(r => r.status === 'Overdue' || (isActiveFamiliarisation(r.status) && isPastDue(r.target_completion_date))).length,
   };
 
   return {

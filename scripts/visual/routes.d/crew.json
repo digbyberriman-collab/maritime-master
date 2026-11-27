@@ -637,5 +637,23 @@
     "slug": "crew-hor-report-denied",
     "persona": "vessel-crew",
     "note": "X1-08B: crew without hours-of-rest access on DRAAK: the route guard keeps the report closed (no access page); nothing of the report is read."
+  },
+  {
+    "path": "/v/dra/crew/familiarisation",
+    "slug": "crew-familiarisation",
+    "waitFor": "[data-familiarisation=\"overview\"] [data-familiarisation-kpis]",
+    "note": "X1-10: Familiarisation per vessel and position: the KPI tiles (completed, in progress, overdue, missing by position), the templates (fleet and vessel, required positions, counts, in use) with Start and Edit, and the recent forms with View all"
+  },
+  {
+    "path": "/v/dra/crew/familiarisation?all=1",
+    "slug": "crew-familiarisation-all",
+    "waitFor": "[data-familiarisation=\"all\"]",
+    "note": "X1-10: every familiarisation form of the vessel (?all=1): search, sort by due date, Show recent only"
+  },
+  {
+    "path": "/v/dra/crew/familiarisation/f2000000-0000-4000-8000-000000000001",
+    "slug": "crew-familiarisation-record",
+    "waitFor": "[data-familiarisation-record]",
+    "note": "X1-10: one record: overdue status and due line, progress, the reopen reason, the checklist by section with who ticked what, and the crew and supervisor sign-off with why Sign is closed. Until PR-X1-G adds rpc/familiarisation_record_detail.json, capture it with a scratch --fixtures copy that answers it; without it the page says the record could not be found."
   }
 ]

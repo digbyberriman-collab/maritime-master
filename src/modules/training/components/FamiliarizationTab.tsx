@@ -8,11 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
-import { useTraining, FamiliarizationRecord, FamiliarizationChecklistItem } from '@/modules/training/hooks/useTraining';
+import { useTraining, isActiveFamiliarisation, FamiliarizationRecord, FamiliarizationChecklistItem } from '@/modules/training/hooks/useTraining';
+import { checklistItemsFromSections, mapLegacyStatus } from '@/modules/crew/lib/familiarisation';
 import { useCrew } from '@/modules/crew/hooks/useCrew';
 import { useVessels } from '@/modules/vessels/hooks/useVessels';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
-import { getFamiliarizationStatusColor, DEFAULT_FAMILIARIZATION_SECTIONS } from '@/modules/training/constants';
+import { DEFAULT_FAMILIARIZATION_SECTIONS } from '@/modules/training/constants';
+import { StatusPill } from '@/shared/components/status';
 import { format, addDays } from 'date-fns';
 import { 
   ClipboardCheck, 
@@ -25,8 +27,23 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
-const FamiliarizationTab: React.FC = () => {
-  const { familiarizationRecords, templates, startFamiliarization, updateChecklistItem, fetchChecklistItems, isLoading } = useTraining();
+type ChecklistItemRow = FamiliarizationChecklistItem & {
+  completed_by?: { first_name: string | null; last_name: string | null } | null;
+};
+
+/** Items in their saved order (item_order: section * 1000 + item for X1-10 records, section * 100 + item for legacy ones). */
+const byOrder = (a: ChecklistItemRow, b: ChecklistItemRow) => (a.item_order ?? 0) - (b.item_order ?? 0);
+
+/**
+ * The legacy familiarisation list (the training page's tab before X1-10;
+ * now the D-01 fallback of crew/familiarisation). X1-10 fixes C63 here
+ * too: starting from a template copies that template's sections into the
+ * checklist (it always copied the default sections), and with `vesselId`
+ * the list and the start dialog keep to the route vessel. Statuses are read
+ * in both vocabularies (legacy In_Progress, X1-10 in_progress, ...).
+ */
+const FamiliarizationTab: React.FC<{ vesselId?: string | null }> = ({ vesselId = null }) => {
+  const { familiarizationRecords: allRecords, templates: allTemplates, startFamiliarization, updateChecklistItem, fetchChecklistItems, isLoading } = useTraining();
   const { crew } = useCrew();
   const { vessels } = useVessels();
   const { profile } = useAuth();
@@ -34,25 +51,29 @@ const FamiliarizationTab: React.FC = () => {
   const [showStartModal, setShowStartModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<FamiliarizationRecord | null>(null);
-  const [checklistItems, setChecklistItems] = useState<(FamiliarizationChecklistItem & { completed_by?: any })[]>([]);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItemRow[]>([]);
+  const familiarizationRecords = vesselId ? allRecords.filter((r) => r.vessel_id === vesselId) : allRecords;
+  const templates = allTemplates.filter((t) => t.is_active !== false && (!vesselId || t.vessel_id === vesselId || t.vessel_id === null));
 
   // Start familiarization form state
   const [formData, setFormData] = useState({
     user_id: '',
-    vessel_id: '',
+    vessel_id: vesselId ?? '',
     template_id: '',
     supervisor_id: '',
     duration_days: 14,
   });
 
-  const activeRecords = familiarizationRecords.filter(r => r.status === 'In_Progress' || r.status === 'Not_Started');
-  const completedRecords = familiarizationRecords.filter(r => r.status === 'Completed');
-  const overdueRecords = familiarizationRecords.filter(r => r.status === 'Overdue');
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const isPastDue = (r: FamiliarizationRecord) => Boolean(r.target_completion_date && r.target_completion_date.slice(0, 10) < today);
+  const activeRecords = familiarizationRecords.filter(r => isActiveFamiliarisation(r.status));
+  const completedRecords = familiarizationRecords.filter(r => mapLegacyStatus(r.status) === 'completed');
+  const overdueRecords = familiarizationRecords.filter(r => r.status === 'Overdue' || (isActiveFamiliarisation(r.status) && isPastDue(r)));
 
   const loadChecklistItems = async (recordId: string) => {
     try {
-      const items = await fetchChecklistItems(recordId);
-      setChecklistItems(items);
+      const items: ChecklistItemRow[] = await fetchChecklistItems(recordId);
+      setChecklistItems([...items].sort(byOrder));
     } catch (error) {
       console.error('Failed to load checklist items:', error);
     }
@@ -69,7 +90,7 @@ const FamiliarizationTab: React.FC = () => {
     await updateChecklistItem.mutateAsync({
       id: item.id,
       completed: newCompleted,
-      completed_date: newCompleted ? new Date().toISOString().split('T')[0] : null,
+      completed_date: newCompleted ? format(new Date(), 'yyyy-MM-dd') : null,
       completed_by_id: newCompleted ? profile?.user_id : null,
     });
 
@@ -85,23 +106,22 @@ const FamiliarizationTab: React.FC = () => {
     const today = new Date();
     const targetDate = addDays(today, formData.duration_days);
 
-    // Build checklist items from default sections
-    const checklistItems = DEFAULT_FAMILIARIZATION_SECTIONS.flatMap((section, sectionIndex) =>
-      section.checklist_items.map((item, itemIndex) => ({
-        section_name: section.section_name,
-        item_text: item,
-        item_order: sectionIndex * 100 + itemIndex,
-        completed: false,
-      }))
-    );
+    // C63: the chosen template's sections become the checklist (the default sections only without one).
+    const template = templates.find((t) => t.id === formData.template_id) ?? null;
+    const fromTemplate = template ? checklistItemsFromSections(template.sections) : [];
+    const checklistItems = (fromTemplate.length > 0 ? fromTemplate : checklistItemsFromSections(DEFAULT_FAMILIARIZATION_SECTIONS)).map((item) => ({
+      ...item,
+      completed: false,
+    }));
 
     await startFamiliarization.mutateAsync({
       record: {
         user_id: formData.user_id,
         vessel_id: formData.vessel_id,
         template_id: formData.template_id || null,
-        join_date: today.toISOString().split('T')[0],
-        target_completion_date: targetDate.toISOString().split('T')[0],
+        // Date-only strings in the viewer's calendar (not the UTC day).
+        join_date: format(today, 'yyyy-MM-dd'),
+        target_completion_date: format(targetDate, 'yyyy-MM-dd'),
         supervisor_id: formData.supervisor_id || null,
         status: 'In_Progress',
         completion_percentage: 0,
@@ -112,11 +132,22 @@ const FamiliarizationTab: React.FC = () => {
     setShowStartModal(false);
     setFormData({
       user_id: '',
-      vessel_id: '',
+      vessel_id: vesselId ?? '',
       template_id: '',
       supervisor_id: '',
       duration_days: 14,
     });
+  };
+
+  const chooseTemplate = (id: string) => {
+    const template = templates.find((t) => t.id === id) ?? null;
+    const days = template?.total_duration_days;
+    setFormData((f) => ({
+      ...f,
+      template_id: id === 'none' ? '' : id,
+      duration_days: typeof days === 'number' && [7, 14, 21, 30].includes(days) ? days : f.duration_days,
+      vessel_id: vesselId ?? template?.vessel_id ?? f.vessel_id,
+    }));
   };
 
   // Group checklist items by section
@@ -228,9 +259,7 @@ const FamiliarizationTab: React.FC = () => {
                           {record.user?.rank || 'Crew'} • {record.vessel?.name}
                         </p>
                       </div>
-                      <Badge className={getFamiliarizationStatusColor(record.status)}>
-                        {record.status.replace('_', ' ')}
-                      </Badge>
+                      <StatusPill domain="familiarization" status={record.status === 'Overdue' ? 'overdue' : mapLegacyStatus(record.status)} size="sm" />
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -252,7 +281,7 @@ const FamiliarizationTab: React.FC = () => {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-muted-foreground" />
-                        <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
+                        <span className={isOverdue ? 'text-critical font-medium' : ''}>
                           {isOverdue ? `${Math.abs(daysLeft)} days overdue` : `${daysLeft} days left`}
                         </span>
                       </div>
@@ -305,18 +334,35 @@ const FamiliarizationTab: React.FC = () => {
             </div>
 
             <div>
-              <Label>Vessel</Label>
-              <Select value={formData.vessel_id} onValueChange={(v) => setFormData({ ...formData, vessel_id: v })}>
+              <Label>Template</Label>
+              <Select value={formData.template_id || 'none'} onValueChange={chooseTemplate}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select vessel" />
+                  <SelectValue placeholder="Select template" />
                 </SelectTrigger>
                 <SelectContent>
-                  {vessels.map(v => (
-                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                  <SelectItem value="none">Default checklist</SelectItem>
+                  {templates.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.template_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {vesselId ? null : (
+              <div>
+                <Label>Vessel</Label>
+                <Select value={formData.vessel_id} onValueChange={(v) => setFormData({ ...formData, vessel_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select vessel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vessels.map(v => (
+                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div>
               <Label>Supervisor</Label>
@@ -402,7 +448,7 @@ const FamiliarizationTab: React.FC = () => {
                   <div key={sectionName} className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h4 className="font-medium flex items-center gap-2">
-                        {isComplete && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                        {isComplete && <CheckCircle2 className="h-4 w-4 text-success" />}
                         {sectionName}
                       </h4>
                       <Badge variant={isComplete ? "default" : "outline"}>

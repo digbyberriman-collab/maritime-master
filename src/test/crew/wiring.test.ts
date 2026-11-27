@@ -82,6 +82,8 @@ describe('pending types and the migrations', () => {
       '20261124060700_crew_hor_engine.sql',
       '20261124060800_crew_hor_board.sql',
       '20261124060900_crew_planner_periods.sql',
+      // Familiarisation (X1-10): its types are the training module's pending file.
+      '20261124061000_crew_familiarisation.sql',
     ]);
   });
 

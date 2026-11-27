@@ -23,6 +23,13 @@
       "tables": { "type": "PlannerPendingTables", "expect": ["leave_types", "crew_leave_request_periods", "crew_leave_settings"] },
       "columns": { "type": "PlannerPendingColumns", "expect": ["frp_rotation_assignments", "crew_leave_entries", "crew_leave_requests"] },
       "functions": { "type": "PlannerPendingFunctions", "expect": ["planner_vessel_periods", "planner_period_upsert", "planner_period_delete", "planner_add_leave", "crew_leave_request_submit", "crew_leave_request_decide", "planner_leave_settings_save", "crew_toggle_onboard", "vessel_manning_by_day"] }
+    },
+    {
+      "file": "src/modules/training/types/db.pending.ts",
+      "mirrors": "X1 spec §6 061000 (X1-10: familiarisation per vessel and position: the required-positions table, the new template columns (company, code, description, due within, signature flags, scope, variant, form, updated), the new record columns (company, profile, due date, signature flags, signatures, reopen, created by), and the familiarisation RPCs: the vessel overview, one record, template save, start, tick, sign, reopen, delete; plus the onboarding-progress and crew dashboard reads X1-10B builds on)",
+      "tables": { "type": "TrainingPendingTables", "expect": ["familiarization_template_positions"] },
+      "columns": { "type": "TrainingPendingColumns", "expect": ["familiarization_templates", "familiarization_records"] },
+      "functions": { "type": "TrainingPendingFunctions", "expect": ["familiarisation_vessel_overview", "familiarisation_record_detail", "familiarisation_template_save", "familiarisation_start", "familiarisation_tick", "familiarisation_sign", "familiarisation_reopen", "familiarisation_delete", "crew_onboarding_progress", "crew_vessel_dashboard"] }
     }
   ],
   "notMirrored": {

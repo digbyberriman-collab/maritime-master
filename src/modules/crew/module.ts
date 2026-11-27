@@ -23,7 +23,9 @@
  *     rebuilt Hours of Rest as the vessel board (beta, behind
  *     vessel.crew.hours_of_rest.approve); X1-08B added its report at
  *     crew/hours-of-rest/report (behind vessel.crew.hours_of_rest.view),
- *     a page under the same leaf, with no leaf of its own.
+ *     a page under the same leaf, with no leaf of its own. X1-10 rebuilt
+ *     Familiarisation (beta, behind vessel.crew.familiarisation.view); a
+ *     record at crew/familiarisation/:recordId is a page under its leaf.
  *     There is no Dashboard leaf yet: a planned leaf at the module root
  *     would turn today's crew -> crew/list redirect into a Coming Soon page
  *     (X1-10B adds it as beta with its page).
@@ -50,7 +52,7 @@ import {
   Briefcase, CheckSquare, ClipboardCheck, Clock, FileCheck, FileText, Network, ShieldCheck, UserCheck, Users,
 } from 'lucide-react';
 import type { ModuleManifest } from '@/app/registry/types';
-import { L, LIVE } from '@/config/navBuilders';
+import { L } from '@/config/navBuilders';
 import { CREW_CAPABILITIES, CREW_CAPS, CREW_ROOT, PERSONAL_ROOT } from './paths';
 import { CREW_ROUTES } from './routes';
 
@@ -93,7 +95,13 @@ const manifest: ModuleManifest = {
         alsoCovers: ['crew/people/*/hours-of-rest'],
       },
     },
-    { slot: 'vessel.crew', order: 80, node: L('Familiarisation', CREW_ROOT, { icon: FileCheck, ...LIVE }) },
+    // X1-10: familiarisation per vessel and position (templates, forms, sign-off), beta behind its capability.
+    // A record (crew/familiarisation/:recordId) is a page under the same leaf.
+    {
+      slot: 'vessel.crew',
+      order: 80,
+      node: L('Familiarisation', CREW_ROOT, { icon: FileCheck, status: 'beta', capability: CREW_CAPS.famView }),
+    },
     // Planned (Coming Soon until their slice): each carries the capability its page will need.
     { slot: 'vessel.crew', order: 90, node: L('Checklists', CREW_ROOT, { icon: CheckSquare }) },
     {
@@ -131,7 +139,8 @@ const manifest: ModuleManifest = {
     { key: 'hor_serious_breach', status: 'live', emitter: 'work_rest_serious_breach_notify() trigger (X1-08)' },
     { key: 'hor_breach_report', status: 'live', emitter: 'work_rest_breach_report_create() (X1-08)' },
     { key: 'hor_correction_requested', status: 'live', emitter: 'work_rest_review_breach() (X1-08)' },
-    { key: 'familiarisation_assigned', status: 'deferred', emitter: 'familiarisation_open_required() (X1-10)' },
+    // Live from X1-10 (20261124061000; familiarisation.test.sql proves the emitter).
+    { key: 'familiarisation_assigned', status: 'live', emitter: 'familiarisation_open_required() through familiarisation_notify_assigned() (X1-10)' },
     { key: 'crew_transfer_submitted', status: 'deferred', emitter: 'transfer_crew_submit() (X1-11)' },
     { key: 'crew_transfer_completed', status: 'deferred', emitter: 'transfer_crew() (X1-11)' },
     { key: 'crew_employment_ended', status: 'deferred', emitter: 'crew_end_employment() (X1-11)' },

@@ -1,0 +1,408 @@
+{
+  "vessel_id": "e0000000-0000-4000-8000-000000000001",
+  "company_id": "c0000000-0000-4000-8000-000000000001",
+  "today": "$date:0",
+  "can_create": true,
+  "can_edit_templates": true,
+  "can_edit_fleet_templates": true,
+  "templates": [
+    {
+      "id": "f1000000-0000-4000-8000-000000000001",
+      "code": "FAM-2026-001",
+      "name": "24-hour safety familiarisation",
+      "description": "What every person on board needs to know before taking up duties.",
+      "scope": "fleet",
+      "vessel_id": null,
+      "variant_of": null,
+      "due_within_days": 1,
+      "requires_crew_signature": true,
+      "requires_supervisor_signature": true,
+      "is_active": true,
+      "form_template_id": null,
+      "sections": [
+        {
+          "section_name": "Alarms and muster",
+          "checklist_items": [
+            "Recognise the general emergency alarm and the fire alarm",
+            "Find your muster station and your lifejacket",
+            "Know your duties on the muster list",
+            "Know how to raise the alarm for a fire, a person overboard or flooding"
+          ]
+        },
+        {
+          "section_name": "Escape and life-saving equipment",
+          "checklist_items": [
+            "Walk the escape routes from your cabin and your place of work",
+            "Locate the liferafts, the rescue boat and the tender stations",
+            "Locate lifebuoys, immersion suits and emergency escape breathing devices"
+          ]
+        },
+        {
+          "section_name": "Fire-fighting and first aid",
+          "checklist_items": [
+            "Locate the fire extinguishers and fire stations near your work and cabin",
+            "Locate the first-aid kits and the medical locker",
+            "Know where the emergency stops and fire dampers are"
+          ]
+        }
+      ],
+      "item_count": 10,
+      "position_ids": [],
+      "updated_at": "$ts:-20d",
+      "applies": true,
+      "replaced_by_variant": false,
+      "completed": 4,
+      "in_progress": 1,
+      "overdue": 0,
+      "missing": 1,
+      "required": 6
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000002",
+      "code": "FAM-DRA-2026-001",
+      "name": "Two-week vessel familiarisation",
+      "description": "The vessel, its routines and your department, with your head of department.",
+      "scope": "vessel",
+      "vessel_id": "e0000000-0000-4000-8000-000000000001",
+      "variant_of": null,
+      "due_within_days": 14,
+      "requires_crew_signature": true,
+      "requires_supervisor_signature": true,
+      "is_active": true,
+      "form_template_id": null,
+      "sections": [
+        {
+          "section_name": "The vessel",
+          "checklist_items": [
+            "Tour of the bridge, engine room, crew areas and guest areas",
+            "General arrangement and fire-control plans",
+            "Watertight doors: where they are and how they close"
+          ]
+        },
+        {
+          "section_name": "Operations",
+          "checklist_items": [
+            "Watchkeeping and handover routine",
+            "Radios, telephones and the public address system",
+            "Mooring, anchoring and passerelle operations"
+          ]
+        },
+        {
+          "section_name": "Safety management",
+          "checklist_items": [
+            "The safety management system and where to find it",
+            "Reporting a near miss, an incident or a non-conformity"
+          ]
+        }
+      ],
+      "item_count": 8,
+      "position_ids": [
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "531730fb-95cb-133d-47dd-40c75b8d61ff",
+        "5aebd9dd-6627-27af-f908-8e90753426f9",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "7a944c6f-5c48-1c62-b883-be88af7d97c1"
+      ],
+      "updated_at": "$ts:-10d",
+      "applies": true,
+      "replaced_by_variant": false,
+      "completed": 3,
+      "in_progress": 2,
+      "overdue": 1,
+      "missing": 1,
+      "required": 6
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000003",
+      "code": "FAM-DRA-2026-002",
+      "name": "Interior service familiarisation",
+      "description": null,
+      "scope": "vessel",
+      "vessel_id": "e0000000-0000-4000-8000-000000000001",
+      "variant_of": null,
+      "due_within_days": 7,
+      "requires_crew_signature": true,
+      "requires_supervisor_signature": true,
+      "is_active": true,
+      "form_template_id": null,
+      "sections": [
+        {
+          "section_name": "Guest areas",
+          "checklist_items": [
+            "Guest cabin layout and turndown routine",
+            "Pantry and service stations",
+            "Linen and laundry rota"
+          ]
+        },
+        {
+          "section_name": "Safety in the interior",
+          "checklist_items": [
+            "Galley fire blanket and gas shut-off",
+            "Chemical storage and safety data sheets"
+          ]
+        }
+      ],
+      "item_count": 5,
+      "position_ids": [
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be"
+      ],
+      "updated_at": "$ts:-5d",
+      "applies": true,
+      "replaced_by_variant": false,
+      "completed": 0,
+      "in_progress": 1,
+      "overdue": 0,
+      "missing": 0,
+      "required": 1
+    },
+    {
+      "id": "f1000000-0000-4000-8000-000000000004",
+      "code": "FAM-DRA-2025-001",
+      "name": "Galley checklist (old)",
+      "description": null,
+      "scope": "vessel",
+      "vessel_id": "e0000000-0000-4000-8000-000000000001",
+      "variant_of": null,
+      "due_within_days": 14,
+      "requires_crew_signature": false,
+      "requires_supervisor_signature": true,
+      "is_active": false,
+      "form_template_id": null,
+      "sections": [
+        {
+          "section_name": "Checklist",
+          "checklist_items": [
+            "Galley tour",
+            "Cold store alarm"
+          ]
+        }
+      ],
+      "item_count": 2,
+      "position_ids": [],
+      "updated_at": "$ts:-200d",
+      "applies": false,
+      "replaced_by_variant": false,
+      "completed": 2,
+      "in_progress": 0,
+      "overdue": 0,
+      "missing": 0,
+      "required": 0
+    }
+  ],
+  "records": [
+    {
+      "id": "f2000000-0000-4000-8000-000000000001",
+      "template_id": "f1000000-0000-4000-8000-000000000002",
+      "template_code": "FAM-DRA-2026-001",
+      "template_name": "Two-week vessel familiarisation",
+      "profile_id": "b0000000-0000-4000-8000-000000000016",
+      "first_name": "Demo",
+      "last_name": "Deckhand",
+      "preferred_name": null,
+      "has_login": true,
+      "status": "in_progress",
+      "join_date": "$date:-144",
+      "due_date": "$date:-3",
+      "overdue": true,
+      "items_total": 8,
+      "items_done": 3,
+      "crew_signed_at": null,
+      "supervisor_signed_at": null,
+      "requires_crew_signature": true,
+      "requires_supervisor_signature": true,
+      "completed_on": null,
+      "created_at": "$ts:-20d",
+      "updated_at": "$ts:-1d"
+    },
+    {
+      "id": "f2000000-0000-4000-8000-000000000002",
+      "template_id": "f1000000-0000-4000-8000-000000000003",
+      "template_code": "FAM-DRA-2026-002",
+      "template_name": "Interior service familiarisation",
+      "profile_id": "b0000000-0000-4000-8000-000000000015",
+      "first_name": "Demo",
+      "last_name": "Chief Stew",
+      "preferred_name": null,
+      "has_login": true,
+      "status": "awaiting_signatures",
+      "join_date": "$date:-135",
+      "due_date": "$date:+4",
+      "overdue": false,
+      "items_total": 5,
+      "items_done": 5,
+      "crew_signed_at": "$ts:-2d",
+      "supervisor_signed_at": null,
+      "requires_crew_signature": true,
+      "requires_supervisor_signature": true,
+      "completed_on": null,
+      "created_at": "$ts:-20d",
+      "updated_at": "$ts:-2d"
+    },
+    {
+      "id": "f2000000-0000-4000-8000-000000000003",
+      "template_id": "f1000000-0000-4000-8000-000000000001",
+      "template_code": "FAM-2026-001",
+      "template_name": "24-hour safety familiarisation",
+      "profile_id": "b0000000-0000-4000-8000-000000000016",
+      "first_name": "Demo",
+      "last_name": "Deckhand",
+      "preferred_name": null,
+      "has_login": true,
+      "status": "completed",
+      "join_date": "$date:-144",
+      "due_date": "$date:-143",
+      "overdue": false,
+      "items_total": 10,
+      "items_done": 10,
+      "crew_signed_at": "$ts:-2d",
+      "supervisor_signed_at": "$ts:-1d",
+      "requires_crew_signature": true,
+      "requires_supervisor_signature": true,
+      "completed_on": "$date:-143",
+      "created_at": "$ts:-20d",
+      "updated_at": "$ts:-3d"
+    },
+    {
+      "id": "f2000000-0000-4000-8000-000000000004",
+      "template_id": "f1000000-0000-4000-8000-000000000002",
+      "template_code": "FAM-DRA-2026-001",
+      "template_name": "Two-week vessel familiarisation",
+      "profile_id": "b0000000-0000-4000-8000-000000000014",
+      "first_name": "Demo",
+      "last_name": "Bosun",
+      "preferred_name": null,
+      "has_login": true,
+      "status": "completed",
+      "join_date": "$date:-126",
+      "due_date": "$date:-112",
+      "overdue": false,
+      "items_total": 8,
+      "items_done": 8,
+      "crew_signed_at": "$ts:-2d",
+      "supervisor_signed_at": "$ts:-1d",
+      "requires_crew_signature": true,
+      "requires_supervisor_signature": true,
+      "completed_on": "$date:-115",
+      "created_at": "$ts:-20d",
+      "updated_at": "$ts:-4d"
+    },
+    {
+      "id": "f2000000-0000-4000-8000-000000000005",
+      "template_id": "f1000000-0000-4000-8000-000000000001",
+      "template_code": "FAM-2026-001",
+      "template_name": "24-hour safety familiarisation",
+      "profile_id": "b0000000-0000-4000-8000-000000000012",
+      "first_name": "Demo",
+      "last_name": "Chief Officer",
+      "preferred_name": null,
+      "has_login": true,
+      "status": "completed",
+      "join_date": "$date:-108",
+      "due_date": "$date:-107",
+      "overdue": false,
+      "items_total": 10,
+      "items_done": 10,
+      "crew_signed_at": "$ts:-2d",
+      "supervisor_signed_at": "$ts:-1d",
+      "requires_crew_signature": true,
+      "requires_supervisor_signature": true,
+      "completed_on": "$date:-107",
+      "created_at": "$ts:-20d",
+      "updated_at": "$ts:-5d"
+    },
+    {
+      "id": "f2000000-0000-4000-8000-000000000006",
+      "template_id": "f1000000-0000-4000-8000-000000000002",
+      "template_code": "FAM-DRA-2026-001",
+      "template_name": "Two-week vessel familiarisation",
+      "profile_id": "b0000000-0000-4000-8000-000000000013",
+      "first_name": "Demo",
+      "last_name": "Chief Engineer",
+      "preferred_name": null,
+      "has_login": true,
+      "status": "open",
+      "join_date": "$date:-117",
+      "due_date": "$date:+9",
+      "overdue": false,
+      "items_total": 8,
+      "items_done": 0,
+      "crew_signed_at": null,
+      "supervisor_signed_at": null,
+      "requires_crew_signature": true,
+      "requires_supervisor_signature": true,
+      "completed_on": null,
+      "created_at": "$ts:-20d",
+      "updated_at": "$ts:-6d"
+    }
+  ],
+  "records_total": 6,
+  "members": [
+    {
+      "profile_id": "b0000000-0000-4000-8000-000000000011",
+      "first_name": "Demo",
+      "last_name": "Master",
+      "preferred_name": null,
+      "has_login": true,
+      "placement_kind": "assignment",
+      "join_date": "$date:-99",
+      "position_id": "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+      "position_name": "Master"
+    },
+    {
+      "profile_id": "b0000000-0000-4000-8000-000000000012",
+      "first_name": "Demo",
+      "last_name": "Chief Officer",
+      "preferred_name": null,
+      "has_login": true,
+      "placement_kind": "assignment",
+      "join_date": "$date:-108",
+      "position_id": "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+      "position_name": "Chief Officer"
+    },
+    {
+      "profile_id": "b0000000-0000-4000-8000-000000000013",
+      "first_name": "Demo",
+      "last_name": "Chief Engineer",
+      "preferred_name": null,
+      "has_login": true,
+      "placement_kind": "assignment",
+      "join_date": "$date:-117",
+      "position_id": "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+      "position_name": "Chief Engineer"
+    },
+    {
+      "profile_id": "b0000000-0000-4000-8000-000000000014",
+      "first_name": "Demo",
+      "last_name": "Bosun",
+      "preferred_name": null,
+      "has_login": true,
+      "placement_kind": "assignment",
+      "join_date": "$date:-126",
+      "position_id": "531730fb-95cb-133d-47dd-40c75b8d61ff",
+      "position_name": "Bosun"
+    },
+    {
+      "profile_id": "b0000000-0000-4000-8000-000000000015",
+      "first_name": "Demo",
+      "last_name": "Chief Stew",
+      "preferred_name": null,
+      "has_login": true,
+      "placement_kind": "assignment",
+      "join_date": "$date:-135",
+      "position_id": "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+      "position_name": "Chief Stew"
+    },
+    {
+      "profile_id": "b0000000-0000-4000-8000-000000000016",
+      "first_name": "Demo",
+      "last_name": "Deckhand",
+      "preferred_name": null,
+      "has_login": true,
+      "placement_kind": "assignment",
+      "join_date": "$date:-144",
+      "position_id": "5aebd9dd-6627-27af-f908-8e90753426f9",
+      "position_name": "Deckhand"
+    }
+  ]
+}

@@ -64,6 +64,11 @@ export const PLANNER_TAB_PATH = `${CREW_PATHS.planner}/:tab`;
  * /crew/leave/requests; D-45) as thin wrappers over the tabs. crew/planner
  * still redirects to timeline. The fleet planner (/fleet/planner?tab=crew)
  * is the same page in fleet scope.
+ * X1-10 serves Familiarisation (FamiliarisationPage, guard
+ * vessel.crew.familiarisation.view; `?all=1` lists every form) in place of
+ * the legacy training page, and one record at crew/familiarisation/:recordId
+ * (FamiliarisationRecordPage, scope guard; the page asks view, or view_own
+ * for the caller's own record).
  * X1-04B adds the person's own documents at /me/documents (scope personal,
  * path `documents`, guard vessel.crew.crew_certificates.view_own; the page
  * asks again and the server answers only for the caller's own profile). The
@@ -119,7 +124,12 @@ export const CREW_ROUTES: readonly RouteDef[] = [
   // page; an unknown tab lands on the timeline in the page. The legacy pages stay the D-01 fallback inside it.
   vesselRedirect(CREW_PATHS.planner, 'timeline'),
   vesselCapabilityPage(PLANNER_TAB_PATH, CREW_CAPS.schedulingView, () => import('@/modules/rotation-planner/pages/PlannerPage')),
-  vesselPage(CREW_PATHS.familiarisation, () => import('@/modules/training/pages/Training')),
+  // Familiarisation per vessel and position (X1-10; gap/04 C63, C36): templates and recent forms (?all=1: every form)
+  // behind familiarisation.view; one record at :recordId behind the scope guard (the page lets a crew member see
+  // their own with view_own, and asks familiarisation.view for anyone else's). The legacy Training tab is the
+  // page's D-01 fallback.
+  vesselCapabilityPage(CREW_PATHS.familiarisation, CREW_CAPS.famView, () => import('@/modules/crew/pages/FamiliarisationPage')),
+  vesselScopePage(`${CREW_PATHS.familiarisation}/:recordId`, () => import('@/modules/crew/pages/FamiliarisationRecordPage')),
   // The person's own documents (X1-04B; gap/04 C24-C26; X1 spec §4 personal row).
   {
     scope: 'personal',
