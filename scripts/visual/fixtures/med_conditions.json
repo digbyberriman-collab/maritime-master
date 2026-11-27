@@ -1,0 +1,12 @@
+[
+  {
+    "id": "f4000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "condition_name": "Asthma",
+    "category": "respiratory",
+    "status": "managed",
+    "affects_fitness": true,
+    "requires_medication": true
+  }
+]

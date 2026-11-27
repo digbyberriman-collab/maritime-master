@@ -165,10 +165,11 @@ describe('while access loads', () => {
 
 describe('the control: a resolved vessel', () => {
   it('keeps its own tab row and sidebar, on its own code', async () => {
-    renderAt('/v/dra/crew/list', { scope: 'vessel', vessel: DRAAK, vesselCode: 'DRA' });
+    // The crew leaves are rebuilt pages behind their capabilities (Phase 3 wave 1), so this vessel user holds them.
+    renderAt('/v/dra/crew/list', { scope: 'vessel', vessel: DRAAK, vesselCode: 'DRA' }, { ...VESSEL_ONLY_ACCESS, can: () => true });
     const row = await screen.findByTestId(SHELL_TEST_IDS.moduleTabBar);
     const crew = await within(row).findByTestId(`${SHELL_TEST_IDS.moduleTabPrefix}crew`);
-    expect(crew).toHaveAttribute('href', '/v/dra/crew/list');
+    expect(crew).toHaveAttribute('href', '/v/dra/crew');
     expect(crew).toHaveAttribute('aria-current', 'page');
     await waitFor(() => expect(screen.getByTestId(SHELL_TEST_IDS.sidebar)).toBeInTheDocument());
     expect(navDump()).toMatchObject({ vessel: { id: DRAAK.id, code: 'DRA', name: 'DRAAK' }, activeTabId: 'crew' });

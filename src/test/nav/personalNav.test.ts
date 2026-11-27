@@ -79,7 +79,7 @@ describe('buildPersonalNav', () => {
   it('marks the leaves with no page yet as planned', () => {
     const planned = navLeaves(buildPersonalNav(() => true)).filter((l) => l.status === 'planned').map((l) => l.path);
     expect(planned.sort()).toEqual(
-      ['/me/billing', '/me/compliance', '/me/documents', '/me/leave', '/me/logs', '/me/signature', '/me/templates'].sort(),
+      ['/me/billing', '/me/compliance', '/me/leave', '/me/logs', '/me/signature', '/me/templates'].sort(),
     );
   });
 });
@@ -100,7 +100,8 @@ describe('MY WORK is a nav slot (personal.my_work, platform-prep PP3)', () => {
       ['Hours of rest', '/me/hours-of-rest', 'live'],
       ['Training', '/me/training', 'live'],
       ['Inbox', '/inbox', 'live'],
-      ['Documents', '/me/documents', 'planned'],
+      // X1-04B (PR-X1-J): the crew module's own documents page, beta behind view_own.
+      ['Documents', '/me/documents', 'beta'],
       ['Leave', '/me/leave', 'planned'],
     ]);
   });
@@ -137,7 +138,7 @@ describe('routes and titles from the tree', () => {
     for (const id of SETTINGS_SECTION_IDS) expect(routed.has(id) || placeholders.has(id) || elsewhere.has(id), id).toBe(true);
     expect(routed.has('support')).toBe(false);
     expect(PERSONAL_SETTINGS_ROUTES.find((r) => r.section === 'notifications')?.path).toBe('notifications/channels');
-    expect(placeholders).toEqual(new Set(['signature', 'documents', 'leave', 'templates', 'compliance', 'billing', 'logs']));
+    expect(placeholders).toEqual(new Set(['signature', 'leave', 'templates', 'compliance', 'billing', 'logs']));
   });
 
   it('knows the section ids and their URLs', () => {

@@ -15,7 +15,7 @@
     "check": "npm run lint && npm run typecheck && npm test",
     "test:db": "node scripts/db/harness.mjs",
     "test:db:unit": "node --test scripts/db/test/*.test.mjs",
-    "test:fixtures": "node scripts/db/gen-vessel-code-corpus.mjs --check && node scripts/db/gen-reference-fixture.mjs --check && node scripts/db/gen-module-settings-fixture.mjs --check && node scripts/db/gen-record-fixtures.mjs --check",
+    "test:fixtures": "node scripts/db/gen-vessel-code-corpus.mjs --check && node scripts/db/gen-reference-fixture.mjs --check && node scripts/db/gen-module-settings-fixture.mjs --check && node scripts/db/gen-record-fixtures.mjs --check && node scripts/db/gen-capability-cases.mjs --check",
     "test:edge": "npx -y deno@2.9.6 test --allow-env --config supabase/functions/deno.json supabase/functions",
     "check:edge": "node scripts/edge/check.mjs"
   },

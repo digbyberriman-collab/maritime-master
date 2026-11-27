@@ -70,6 +70,13 @@ SELECT tests.ok(public.storage_object_company('x.pdf') IS NULL AND public.storag
 
 -- ------------------------------------------------------------ without X1's predicates: the prefix is closed
 
+-- X1's real predicates (20261124060400, edited by 060500) are in the build-out. This rolled-back
+-- file drops them, so the sections below test the gate itself: closed without a predicate, open
+-- only per a predicate's answer. X1's crew/document_catalogue and document_verification tests
+-- cover the real predicates.
+SELECT tests.reset_role();
+DROP FUNCTION IF EXISTS public.crew_document_file_readable(uuid, uuid);
+DROP FUNCTION IF EXISTS public.crew_document_file_writable(uuid, uuid);
 SELECT tests.ok(to_regprocedure('public.crew_document_file_readable(uuid,uuid)') IS NULL AND to_regprocedure('public.crew_document_file_writable(uuid,uuid)') IS NULL,
                 'setup: X1''s predicates are not in the database');
 SELECT tests.as_user(tests.user_id('A.fleet_manager'));

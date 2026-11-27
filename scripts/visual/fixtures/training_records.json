@@ -1,0 +1,32 @@
+[
+  {
+    "id": "f9000000-0000-4000-8000-000000000001",
+    "user_id": "a0000000-0000-4000-8000-000000000015",
+    "course_id": "f8000000-0000-4000-8000-000000000001",
+    "completion_date": "$date:-1700",
+    "issue_date": "$date:-1700",
+    "expiry_date": "$date:+40",
+    "training_provider": "A maritime training centre",
+    "status": "valid"
+  },
+  {
+    "id": "f9000000-0000-4000-8000-000000000002",
+    "user_id": "a0000000-0000-4000-8000-000000000015",
+    "course_id": "f8000000-0000-4000-8000-000000000002",
+    "completion_date": "$date:-400",
+    "issue_date": "$date:-400",
+    "expiry_date": "$date:+700",
+    "training_provider": "A hospitality school",
+    "status": "valid"
+  },
+  {
+    "id": "f9000000-0000-4000-8000-000000000003",
+    "user_id": "a0000000-0000-4000-8000-000000000015",
+    "course_id": "f8000000-0000-4000-8000-000000000003",
+    "completion_date": "$date:-2000",
+    "issue_date": "$date:-2000",
+    "expiry_date": null,
+    "training_provider": "A maritime training centre",
+    "status": "valid"
+  }
+]

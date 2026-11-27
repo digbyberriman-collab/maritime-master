@@ -12,6 +12,7 @@ import { Navigate, Routes, createRoutesFromChildren, matchRoutes, resolvePath, t
 import { AppRoutes } from '@/routes';
 import { LegacyRoute, ScopeNotFound } from '@/app/router/scopes';
 import KeepSearchNavigate from '@/app/router/KeepSearchNavigate';
+import ModuleRoute from '@/shared/components/ModuleRoute';
 
 type WithChildren = React.ReactElement<{ children?: React.ReactNode }>;
 
@@ -101,10 +102,23 @@ export function resolveUrl(routes: RouteObject[], url: string): Resolved {
   throw new Error(`redirect loop from ${url}: ${hops.join(' -> ')}`);
 }
 
-export const isLazyPage = (el: React.ReactElement | null): boolean =>
+/** The lazy page element itself (lazyPage(), src/app/router/lazyPage.tsx). */
+const isBareLazyPage = (el: React.ReactElement | null | undefined): boolean =>
   !!el &&
   typeof el.type === 'function' &&
   String((el.type as { displayName?: string }).displayName ?? '').startsWith('LazyPage');
+
+/**
+ * A route opens a page: a lazy page, or a manifest page behind its module or
+ * capability guard (`<ModuleRoute …><Page/></ModuleRoute>`, manifestRoutes.tsx),
+ * which Phase 3 streams use for every rebuilt page.
+ */
+export const isLazyPage = (el: React.ReactElement | null): boolean => {
+  if (isBareLazyPage(el)) return true;
+  if (!el || el.type !== ModuleRoute) return false;
+  const child = (el.props as { children?: React.ReactNode }).children;
+  return React.isValidElement(child) && isBareLazyPage(child);
+};
 
 const isPlaceholderWrapper = (el: React.ReactElement | null | undefined): boolean =>
   !!el && typeof el.type === 'function' && (el.type as { name?: string }).name === 'PlaceholderWrapper';
@@ -201,7 +215,7 @@ export function describeElement(node: React.ReactNode): string {
   const props = node.props as Record<string, unknown> & { children?: React.ReactNode };
   if (node.type === Navigate || node.type === KeepSearchNavigate) return `redirect(${String(props.to)})`;
   if (node.type === LegacyRoute) return `legacy(${String(props.from)}) > ${describeElement(props.children)}`;
-  if (isLazyPage(node)) {
+  if (isBareLazyPage(node)) {
     const meta = ((node.type as { meta?: LazyMeta }).meta ?? {}) as LazyMeta;
     const label = meta.label ? ` label=${meta.label}` : '';
     return `page(${loaderTarget(meta.loader)}) guard=${describeWrapper(meta.guard)} layout=${describeWrapper(meta.layout)}${label}${propSummary(props)}`;

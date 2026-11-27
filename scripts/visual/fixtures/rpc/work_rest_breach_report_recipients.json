@@ -1,0 +1,18 @@
+[
+  {
+    "user_id": "a0000000-0000-4000-8000-000000000001",
+    "profile_id": "b0000000-0000-4000-8000-000000000001",
+    "first_name": "Demo",
+    "last_name": "Fleet Manager",
+    "preferred_name": null,
+    "kind": "dpa"
+  },
+  {
+    "user_id": "a0000000-0000-4000-8000-000000000036",
+    "profile_id": "b0000000-0000-4000-8000-000000000036",
+    "first_name": "Demo",
+    "last_name": "Purser",
+    "preferred_name": null,
+    "kind": "fleet_hr"
+  }
+]

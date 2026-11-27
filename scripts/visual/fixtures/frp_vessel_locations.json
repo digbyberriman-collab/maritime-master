@@ -1,0 +1,35 @@
+[
+  {
+    "id": "c9200000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "start_date": "$date:-20",
+    "end_date": "$date:+4",
+    "location_name": "Antibes",
+    "location_status": "confirmed",
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "id": "c9200000-0000-4000-8000-000000000002",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "start_date": "$date:+5",
+    "end_date": "$date:+9",
+    "location_name": "Delivery to Palma",
+    "location_status": "estimated",
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "id": "c9200000-0000-4000-8000-000000000003",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "start_date": "$date:+10",
+    "end_date": "$date:+40",
+    "location_name": "Palma refit",
+    "location_status": "tbc",
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  }
+]

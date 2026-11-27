@@ -1,7 +1,7 @@
 /**
  * Pending tables, columns and RPCs of the planner (X1; DECISIONS D-01;
  * gap/00 D2). Each block mirrors one unapplied migration of block 06; the
- * harness contract phase (scripts/db/contract-map.d/crew.json) checks every
+ * harness contract phase (scripts/db/contract-map.json) checks every
  * column, CHECK list and argument against the built schema.
  *
  * 20261124060900_crew_planner_periods.sql (X1-09): the leave types (one

@@ -80,8 +80,9 @@ describe('KeepSearchNavigate in the route tree', () => {
   });
 
   it('a vessel module-root redirect (VESSEL_ROOT_REDIRECTS) keeps the query and hash', () => {
-    expect(VESSEL_ROOT_REDIRECTS.find((r) => r.from === 'crew')?.to).toBe('list');
-    expect(land('/v/dra/crew?a=1#h', '/v/:vesselCode/crew', '/v/:vesselCode', 'crew')).toBe('/v/dra/crew/list?a=1#h');
+    // The crew root is a page (the crew dashboard, X1-10B), so Safety is the example here.
+    expect(VESSEL_ROOT_REDIRECTS.find((r) => r.from === 'safety')?.to).toBe('drills');
+    expect(land('/v/dra/safety?a=1#h', '/v/:vesselCode/safety', '/v/:vesselCode', 'safety')).toBe('/v/dra/safety/drills?a=1#h');
   });
 
   it('a retired Coming Soon redirect (RETIRED_NAV_REDIRECTS) keeps the query and hash', () => {

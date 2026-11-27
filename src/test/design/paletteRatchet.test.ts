@@ -46,7 +46,7 @@ const LOCKED_AT_ZERO = [
   'src/modules/development/pages/CoursesRegister.tsx',
   'src/modules/training/components/TrainingMatrixTab.tsx',
   'src/modules/dashboard/pages/FleetMap.tsx',
-  'src/modules/dashboard/components/fleet/RegionMapCard.tsx',
+  'src/modules/dashboard/components/fleet/FleetGroupMaps.tsx',
   'src/modules/itinerary/components/HeatMapTab.tsx',
 ];
 

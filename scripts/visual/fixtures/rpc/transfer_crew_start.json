@@ -1,0 +1,57 @@
+{
+  "id": "f1100000-0000-4000-8000-000000000001",
+  "status": "draft",
+  "profile_id": "b0000000-0000-4000-8000-000000000014",
+  "user_id": "a0000000-0000-4000-8000-000000000014",
+  "person": {
+    "first_name": "Demo",
+    "preferred_name": null,
+    "last_name": "Bosun"
+  },
+  "from_vessel": {
+    "id": "e0000000-0000-4000-8000-000000000001",
+    "name": "DRAAK",
+    "code": "DRA"
+  },
+  "to_vessel": {
+    "id": "e0000000-0000-4000-8000-000000000007",
+    "name": "HYDRA",
+    "code": "HYD"
+  },
+  "from_position": {
+    "id": "531730fb-95cb-133d-47dd-40c75b8d61ff",
+    "name": "Bosun"
+  },
+  "to_position": {
+    "id": "f1100000-0000-4000-8000-0000000000a1",
+    "name": "Bosun"
+  },
+  "same_role": true,
+  "sign_off_date": "$date:+7",
+  "sign_on_date": "$date:+8",
+  "requires_approval": false,
+  "review": null,
+  "acknowledgements": [],
+  "acknowledged": false,
+  "notes": "Relieving the HYDRA bosun for the yard period.",
+  "created_at": "$ts:-5m",
+  "created_by_name": "Demo Fleet Manager",
+  "submitted_at": null,
+  "submitted_by_name": null,
+  "approved_at": null,
+  "approved_by_name": null,
+  "decline_reason": null,
+  "cancelled_at": null,
+  "cancelled_by_name": null,
+  "cancelled_reason": null,
+  "completed_at": null,
+  "compliant_on_destination_at": null,
+  "rights": {
+    "can_edit": true,
+    "can_submit": false,
+    "can_decide": false,
+    "can_cancel": true,
+    "can_complete": false,
+    "decide_block": null
+  }
+}

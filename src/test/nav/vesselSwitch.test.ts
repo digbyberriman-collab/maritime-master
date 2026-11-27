@@ -145,9 +145,9 @@ describe('vessel page visibility in the filtered vessel nav', () => {
 
   it('a planned (hidden) child or tab is not', () => {
     const visible = visibility(builtOnly);
-    // Crew Medical and the whole Charter tab are planned.
-    expect(visible('crew/medical')).toBe(false);
-    expect(visible('CREW/Medical')).toBe(false);
+    // Performance Appraisals (X1 wave 2) and the whole Charter tab are planned.
+    expect(visible('crew/appraisals')).toBe(false);
+    expect(visible('CREW/Appraisals')).toBe(false);
     expect(visible('charter')).toBe(false);
   });
 

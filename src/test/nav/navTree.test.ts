@@ -108,7 +108,8 @@ describe('buildVesselTabs (the real vessel tree)', () => {
     const tabs = buildVesselTabs({ code: 'DRA', resolver, decide: decide(() => true) });
     expect(tabs.map((t) => t.id)).toEqual(['home', 'crew', 'safety', 'certificates', 'technical', 'vessel', 'logbooks', 'calendar']);
     expect(tabs[0]).toMatchObject({ path: '/v/dra', href: '/v/dra' });
-    expect(tabs.find((t) => t.id === 'crew')?.href).toBe('/v/dra/crew/list');
+    // The crew root is the crew dashboard (X1-10B), so the tab opens it.
+    expect(tabs.find((t) => t.id === 'crew')?.href).toBe('/v/dra/crew');
   });
 
   it('shows the planned tabs with the roadmap and applies the labels last (Charter → Trip, Planner → Leave)', () => {
@@ -142,7 +143,7 @@ describe('buildVesselTabs (the real vessel tree)', () => {
     expect(visible('crew/list/12')).toBe(true);
     expect(visible('logbooks')).toBe(false);
     expect(visible('technical/jobs/9')).toBe(false);
-    // A planned leaf (hidden without the roadmap) is not visible either.
-    expect(visible('crew/medical')).toBe(false);
+    // A planned leaf (hidden without the roadmap) is not visible either (Performance Appraisals, X1 wave 2).
+    expect(visible('crew/appraisals')).toBe(false);
   });
 });

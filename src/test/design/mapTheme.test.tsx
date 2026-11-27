@@ -281,7 +281,7 @@ describe('no white Leaflet chrome and no hard-coded map colours', () => {
   it.each([
     'src/shared/components/data/mapTheme.ts',
     'src/modules/dashboard/pages/FleetMap.tsx',
-    'src/modules/dashboard/components/fleet/RegionMapCard.tsx',
+    'src/modules/dashboard/components/fleet/FleetGroupMaps.tsx',
     'src/modules/itinerary/components/HeatMapTab.tsx',
   ])('%s has no hex colours, white fills or raw tile hosts', (file) => {
     const src = readRepoFile(file);

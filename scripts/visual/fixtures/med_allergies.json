@@ -1,0 +1,32 @@
+[
+  {
+    "id": "f3000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "allergen": "Peanuts",
+    "allergy_type": "food",
+    "severity": "anaphylaxis",
+    "carries_autoinjector": true,
+    "is_active": true
+  },
+  {
+    "id": "f3000000-0000-4000-8000-000000000002",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "allergen": "Penicillin",
+    "allergy_type": "drug",
+    "severity": "moderate",
+    "carries_autoinjector": false,
+    "is_active": true
+  },
+  {
+    "id": "f3000000-0000-4000-8000-000000000003",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "allergen": "Dust mites",
+    "allergy_type": "environmental",
+    "severity": "mild",
+    "carries_autoinjector": false,
+    "is_active": true
+  }
+]

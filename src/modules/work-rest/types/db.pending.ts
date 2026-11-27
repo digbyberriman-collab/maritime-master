@@ -14,7 +14,7 @@
  * ../services/workRestService.ts), keeping today's legacy path while they
  * are missing.
  *
- * The harness contract phase (scripts/db/contract-map.d/crew.json) holds
+ * The harness contract phase (scripts/db/contract-map.json) holds
  * these shapes to the SQL. Mirrored names only; the internal helpers
  * (work_rest_rule_eval, work_rest_month_decide, the gates and the
  * recompute; 060800's member, label, recipient and reminder helpers and

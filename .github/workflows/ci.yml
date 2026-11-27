@@ -44,11 +44,11 @@ jobs:
         run: npm test
 
       # node:test suites for the visual harness: grading, the PostgREST mock,
-      # scripted actions and personas, and the D-08 no-personal-data check on
-      # the shipped fixtures. The browser suite (inspect.browser.test.mjs)
-      # needs Playwright and stays out.
+      # scripted actions and personas, the routes.d / fixtures.d overlays, and
+      # the D-08 no-personal-data check on the shipped fixtures. The browser
+      # suite (inspect.browser.test.mjs) needs Playwright and stays out.
       - name: Visual harness unit tests
-        run: node --test scripts/visual/test/harness.test.mjs scripts/visual/test/postgrest.test.mjs scripts/visual/test/actions.test.mjs
+        run: node --test scripts/visual/test/harness.test.mjs scripts/visual/test/postgrest.test.mjs scripts/visual/test/actions.test.mjs scripts/visual/test/overlays.test.mjs
 
       - name: Build
         run: npm run build
@@ -123,7 +123,7 @@ jobs:
         run: npm run check:edge
 
       - name: deno lint (migrated functions)
-        run: npx -y deno@2.9.6 lint --config supabase/functions/deno.json supabase/functions/_shared supabase/functions/send-invitation supabase/functions/accept-invitation supabase/functions/bulk-invite supabase/functions/admin-actions supabase/functions/send-email supabase/functions/create-crew-member
+        run: npx -y deno@2.9.6 lint --config supabase/functions/deno.json supabase/functions/_shared supabase/functions/send-invitation supabase/functions/accept-invitation supabase/functions/bulk-invite supabase/functions/admin-actions supabase/functions/send-email supabase/functions/create-crew-member supabase/functions/hr-daily-sweeper
 
       - name: deno test
         run: npm run test:edge

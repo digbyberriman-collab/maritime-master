@@ -1,0 +1,82 @@
+[
+  {
+    "id": "f2000000-0000-4000-8000-000000000002",
+    "status": "cancelled",
+    "profile_id": "b0000000-0000-4000-8000-000000000015",
+    "user_id": "a0000000-0000-4000-8000-000000000015",
+    "person": {
+      "first_name": "Demo",
+      "last_name": "Chief Stew"
+    },
+    "from_vessel": {
+      "id": "e0000000-0000-4000-8000-000000000001",
+      "name": "DRAAK",
+      "code": "DRA"
+    },
+    "to_vessel": {
+      "id": "e0000000-0000-4000-8000-000000000007",
+      "name": "HYDRA",
+      "code": "HYD"
+    },
+    "from_position": {
+      "id": "pos-cs",
+      "name": "Chief Stew"
+    },
+    "to_position": {
+      "id": "pos-hs",
+      "name": "Head of Housekeeping"
+    },
+    "same_role": false,
+    "sign_off_date": "$date:-20",
+    "sign_on_date": "$date:-18",
+    "requires_approval": true,
+    "review": null,
+    "acknowledgements": [],
+    "acknowledged": true,
+    "notes": null,
+    "created_at": "$ts:-30d",
+    "created_by_name": "Demo Fleet Manager",
+    "rights": {},
+    "cancelled_reason": "HYDRA filled the role from its own crew."
+  },
+  {
+    "id": "f2000000-0000-4000-8000-000000000001",
+    "status": "completed",
+    "profile_id": "b0000000-0000-4000-8000-000000000015",
+    "user_id": "a0000000-0000-4000-8000-000000000015",
+    "person": {
+      "first_name": "Demo",
+      "last_name": "Chief Stew"
+    },
+    "from_vessel": {
+      "id": "e0000000-0000-4000-8000-000000000002",
+      "name": "GAME CHANGER",
+      "code": "GAM"
+    },
+    "to_vessel": {
+      "id": "e0000000-0000-4000-8000-000000000001",
+      "name": "DRAAK",
+      "code": "DRA"
+    },
+    "from_position": {
+      "id": "pos-cs",
+      "name": "Chief Stew"
+    },
+    "to_position": {
+      "id": "pos-cs",
+      "name": "Chief Stew"
+    },
+    "same_role": true,
+    "sign_off_date": "$date:-137",
+    "sign_on_date": "$date:-135",
+    "requires_approval": false,
+    "review": null,
+    "acknowledgements": [],
+    "acknowledged": true,
+    "notes": null,
+    "created_at": "$ts:-160d",
+    "created_by_name": "Demo Fleet Manager",
+    "rights": {},
+    "completed_at": "$ts:-135d"
+  }
+]

@@ -1,0 +1,41 @@
+[
+  {
+    "id": "f7000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "consultation_number": "MED-DRA-2026-014",
+    "occurred_at": "$ts:-12d",
+    "is_confidential": false,
+    "consultation_type": "walk_in",
+    "outcome": "resolved",
+    "fit_for_duty": "fit",
+    "follow_up_on": null
+  },
+  {
+    "id": "f7000000-0000-4000-8000-000000000002",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "consultation_number": "MED-DRA-2026-011",
+    "occurred_at": "$ts:-40d",
+    "is_confidential": false,
+    "consultation_type": "follow_up",
+    "outcome": "monitoring",
+    "fit_for_duty": "light_duties",
+    "follow_up_on": "$date:+5"
+  },
+  {
+    "id": "f7000000-0000-4000-8000-000000000003",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "consultation_number": "MED-DRA-2026-006",
+    "occurred_at": "$ts:-95d",
+    "is_confidential": true,
+    "consultation_type": "scheduled",
+    "outcome": "referred_shoreside",
+    "fit_for_duty": "fit",
+    "follow_up_on": null
+  }
+]

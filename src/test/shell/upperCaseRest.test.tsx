@@ -78,7 +78,7 @@ describe('an upper-case vessel rest (D-111)', () => {
     async (path) => {
       renderShell(<Shell />, { path, scope: VESSEL });
       const nav = await screen.findByRole('navigation', { name: 'Crew folders' });
-      const current = await within(nav).findByRole('link', { name: /^Crew List, current page/ });
+      const current = await within(nav).findByRole('link', { name: /^Crew List(, beta)?, current page/ });
       expect(current).toHaveAttribute('aria-current', 'page');
       expect(current).toHaveAttribute('href', '/v/dra/crew/list');
       expect(nav.querySelectorAll('[aria-current="page"]')).toHaveLength(1);

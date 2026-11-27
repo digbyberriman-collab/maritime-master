@@ -143,7 +143,8 @@ describe('tabs', () => {
     expect(safety).toHaveAttribute('aria-current', 'page');
     expect(safety).toHaveAccessibleName('Safety, 3 pending compliance items');
     expect(safety).toHaveClass('text-primary');
-    expect(screen.getByTestId(`${SHELL_TEST_IDS.moduleTabPrefix}crew`)).toHaveAttribute('href', '/v/dra/crew/list');
+    // The crew root is the crew dashboard (X1-10B).
+    expect(screen.getByTestId(`${SHELL_TEST_IDS.moduleTabPrefix}crew`)).toHaveAttribute('href', '/v/dra/crew');
     expect(screen.getByTestId(`${SHELL_TEST_IDS.moduleTabPrefix}home`)).toHaveAttribute('href', '/v/dra');
     expect(screen.getByTestId(`${SHELL_TEST_IDS.moduleTabPrefix}crew`)).not.toHaveAttribute('aria-current');
   });

@@ -1,7 +1,7 @@
 /**
  * Pending tables and RPCs of the crew module (X1; DECISIONS D-01; gap/00
  * D2). Each block mirrors one unapplied migration of block 06; the harness
- * contract phase (scripts/db/contract-map.d/crew.json) checks every column,
+ * contract phase (scripts/db/contract-map.json) checks every column,
  * CHECK list and argument against the built schema.
  *
  * 20261124060100_crew_reference_positions.sql (X1-01): the global

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "f8000000-0000-4000-8000-000000000001",
+    "course_name": "Proficiency in survival craft and rescue boats",
+    "course_code": "PSCRB",
+    "course_category": "safety",
+    "is_mandatory": true
+  },
+  {
+    "id": "f8000000-0000-4000-8000-000000000002",
+    "course_name": "Food safety level 2",
+    "course_code": "FS2",
+    "course_category": "hospitality",
+    "is_mandatory": false
+  },
+  {
+    "id": "f8000000-0000-4000-8000-000000000003",
+    "course_name": "Ship security awareness",
+    "course_code": "SSA",
+    "course_category": "security",
+    "is_mandatory": true
+  }
+]

@@ -15,6 +15,8 @@ test('globs select test files relative to supabase/tests/sql', () => {
   assert.deepEqual(selectTestFiles(FILES, 'p2_*/**'), ['p2_reach/reach.test.sql', 'p2_reach/nested/deep.test.sql']);
   assert.deepEqual(selectTestFiles(FILES, 'p2_*/*'), ['p2_reach/reach.test.sql']);
   assert.deepEqual(selectTestFiles(FILES, '{p1_*,zz_*}/**'), ['p1_vessel_tenancy/codes.test.sql', 'zz_platform/acl.test.sql']);
+  assert.deepEqual(selectTestFiles(FILES, 'p1_*/**,zz_*/**'), ['p1_vessel_tenancy/codes.test.sql', 'zz_platform/acl.test.sql'], 'a top-level comma list selects the union');
+  assert.deepEqual(selectTestFiles(FILES, '{p1_*,zz_*}/**, 00_harness'), ['00_harness/stub_smoke.test.sql', 'p1_vessel_tenancy/codes.test.sql', 'zz_platform/acl.test.sql'], 'braces keep their commas; spaces around a comma are ignored');
   assert.deepEqual(selectTestFiles(FILES, 'p2_reach'), ['p2_reach/reach.test.sql', 'p2_reach/nested/deep.test.sql'], 'a bare directory selects everything under it');
   assert.deepEqual(selectTestFiles(FILES, '**/acl.test.sql'), ['zz_platform/acl.test.sql']);
   assert.deepEqual(selectTestFiles(FILES, 'p9_*/**'), []);

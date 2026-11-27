@@ -1,0 +1,9 @@
+[
+  {
+    "can_view": true,
+    "can_add": true,
+    "can_edit": true,
+    "is_own": false,
+    "uploads_enabled": true
+  }
+]

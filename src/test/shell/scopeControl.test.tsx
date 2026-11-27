@@ -232,8 +232,8 @@ describe('the Fleet segment target', () => {
     ['/v/dra/crew/training/records', '/fleet/training'],
     ['/v/dra/calendar', '/fleet/calendar'],
     ['/v/dra', '/fleet/dashboard'],
-    // Fleet › Medical is planned (hidden): its counterpart falls back to the dashboard.
-    ['/v/dra/crew/medical', '/fleet/dashboard'],
+    // Vessel Crew Medical and Fleet › Medical are counterparts (X5-08, both beta).
+    ['/v/dra/crew/medical', '/fleet/medical'],
     // No counterpart.
     ['/v/dra/logbooks', '/fleet/dashboard'],
   ])('from %s goes to %s', async (path, target) => {
@@ -243,8 +243,8 @@ describe('the Fleet segment target', () => {
 
   it('never uses a counterpart the user cannot see', async () => {
     renderShell(<ScopeControl />, { path: '/v/dra/crew/training', scope: vesselScope, access: { ...FLEET_ACCESS, can: () => false } });
-    // Training is live and ungated: still visible without capabilities.
-    expect(await screen.findByTestId(SHELL_TEST_IDS.scopeFleet)).toHaveAttribute('href', '/fleet/training');
+    // Fleet › Training needs fleet.operations.fleet_training.view (X5-07B): without it, the dashboard.
+    expect(await screen.findByTestId(SHELL_TEST_IDS.scopeFleet)).toHaveAttribute('href', '/fleet/dashboard');
   });
 });
 

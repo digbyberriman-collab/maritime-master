@@ -11,7 +11,7 @@ import { matchRoutes, type RouteObject } from 'react-router-dom';
 import { FleetScope, HomeRedirect, PersonalScope, VesselScopeRoute, WorkspaceScope } from '@/app/router/scopes';
 import { FLEET_RBAC_ROLES, hasFleetReach, landingPath } from '@/app/router/reach';
 import { PersonalIndexRedirect } from '@/app/router/personalRoutes';
-import { appRouteObjects, flatRoutes, isLazyPage, resolveUrl } from './routeHarness';
+import { appRouteObjects, describeElement, flatRoutes, isLazyPage, resolveUrl } from './routeHarness';
 
 const routes = appRouteObjects();
 const flat = flatRoutes(routes);
@@ -108,8 +108,12 @@ describe('scoped route trees', () => {
     expect(isLazyPage(r.element)).toBe(true);
   });
 
-  it('module roots inside a vessel redirect to a page of that module', () => {
-    expect(resolveUrl(routes, '/v/dra/crew').url).toBe('/v/dra/crew/list');
+  it('module roots inside a vessel redirect to a page of that module, or are one', () => {
+    // The crew root is the crew dashboard (X1-10B, gap/04 C2), a page of its own.
+    const crew = resolveUrl(routes, '/v/dra/crew');
+    expect(crew.url).toBe('/v/dra/crew');
+    expect(isLazyPage(crew.element)).toBe(true);
+    expect(describeElement(crew.element)).toContain('page(/src/modules/crew/pages/CrewDashboardPage.tsx)');
     expect(resolveUrl(routes, '/v/dra/safety').url).toBe('/v/dra/safety/drills');
     expect(resolveUrl(routes, '/v/dra/vessel').url).toBe('/v/dra/vessel/emergency');
     expect(resolveUrl(routes, '/v/dra/crew/planner').url).toBe('/v/dra/crew/planner/timeline');

@@ -2,7 +2,7 @@
  * Pending tables, columns and RPCs of familiarisation (X1-10; DECISIONS
  * D-01; gap/00 D2). Mirrors the unapplied migration
  * 20261124061000_crew_familiarisation.sql; the harness contract phase
- * (scripts/db/contract-map.d/crew.json) checks every column, CHECK list and
+ * (scripts/db/contract-map.json) checks every column, CHECK list and
  * argument against the built schema.
  *
  * - familiarization_template_positions: the positions a template is

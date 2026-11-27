@@ -1,0 +1,125 @@
+{
+  "id": "f2000000-0000-4000-8000-000000000001",
+  "company_id": "c0000000-0000-4000-8000-000000000001",
+  "vessel_id": "e0000000-0000-4000-8000-000000000001",
+  "vessel_name": "DRAAK",
+  "template_id": "f1000000-0000-4000-8000-000000000002",
+  "template_code": "FAM-DRA-2026-001",
+  "template_name": "Two-week vessel familiarisation",
+  "template_description": "The vessel, its routines and your department, with your head of department.",
+  "template_scope": "vessel",
+  "profile_id": "b0000000-0000-4000-8000-000000000016",
+  "person": {
+    "first_name": "Demo",
+    "last_name": "Deckhand",
+    "preferred_name": null,
+    "avatar_url": null,
+    "has_login": true
+  },
+  "status": "in_progress",
+  "join_date": "$date:-144",
+  "due_date": "$date:-3",
+  "overdue": true,
+  "completed_on": null,
+  "items_total": 8,
+  "items_done": 3,
+  "requires_crew_signature": true,
+  "requires_supervisor_signature": true,
+  "crew_signed_at": null,
+  "crew_signed_by_name": null,
+  "supervisor_signed_at": null,
+  "supervisor_signed_by_name": null,
+  "reopened_at": "$ts:-6d",
+  "reopened_reason": "The watertight door drill was not done; walk it again with the Bosun.",
+  "reopened_by_name": "Demo Chief Officer",
+  "items": [
+    {
+      "id": "f3000000-0000-4000-8000-000000000001",
+      "section_name": "The vessel",
+      "item_text": "Tour of the bridge, engine room, crew areas and guest areas",
+      "item_order": 1001,
+      "completed": true,
+      "completed_date": "$date:-5",
+      "completed_by_name": "Demo Chief Officer",
+      "notes": null
+    },
+    {
+      "id": "f3000000-0000-4000-8000-000000000002",
+      "section_name": "The vessel",
+      "item_text": "General arrangement and fire-control plans",
+      "item_order": 1002,
+      "completed": true,
+      "completed_date": "$date:-5",
+      "completed_by_name": "Demo Chief Officer",
+      "notes": null
+    },
+    {
+      "id": "f3000000-0000-4000-8000-000000000003",
+      "section_name": "The vessel",
+      "item_text": "Watertight doors: where they are and how they close",
+      "item_order": 1003,
+      "completed": true,
+      "completed_date": "$date:-5",
+      "completed_by_name": "Demo Chief Officer",
+      "notes": null
+    },
+    {
+      "id": "f3000000-0000-4000-8000-000000000004",
+      "section_name": "Operations",
+      "item_text": "Watchkeeping and handover routine",
+      "item_order": 2001,
+      "completed": false,
+      "completed_date": null,
+      "completed_by_name": null,
+      "notes": null
+    },
+    {
+      "id": "f3000000-0000-4000-8000-000000000005",
+      "section_name": "Operations",
+      "item_text": "Radios, telephones and the public address system",
+      "item_order": 2002,
+      "completed": false,
+      "completed_date": null,
+      "completed_by_name": null,
+      "notes": null
+    },
+    {
+      "id": "f3000000-0000-4000-8000-000000000006",
+      "section_name": "Operations",
+      "item_text": "Mooring, anchoring and passerelle operations",
+      "item_order": 2003,
+      "completed": false,
+      "completed_date": null,
+      "completed_by_name": null,
+      "notes": null
+    },
+    {
+      "id": "f3000000-0000-4000-8000-000000000007",
+      "section_name": "Safety management",
+      "item_text": "The safety management system and where to find it",
+      "item_order": 3001,
+      "completed": false,
+      "completed_date": null,
+      "completed_by_name": null,
+      "notes": null
+    },
+    {
+      "id": "f3000000-0000-4000-8000-000000000008",
+      "section_name": "Safety management",
+      "item_text": "Reporting a near miss, an incident or a non-conformity",
+      "item_order": 3002,
+      "completed": false,
+      "completed_date": null,
+      "completed_by_name": null,
+      "notes": null
+    }
+  ],
+  "rights": {
+    "tick": "ok",
+    "sign_crew": "items_open",
+    "sign_supervisor": "items_open",
+    "reopen": "not_reopenable",
+    "delete": "not_deletable",
+    "is_own": false
+  }
+}

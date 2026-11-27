@@ -187,5 +187,12 @@
     "scope": "fleet",
     "restrictions": {},
     "source": "role"
+  },
+  {
+    "module_key": "crew.approve_leave",
+    "permission": "view",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
   }
 ]

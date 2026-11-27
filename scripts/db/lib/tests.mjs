@@ -61,11 +61,31 @@ export function globToRegExp(glob) {
   return new RegExp(wildcard ? `^${re}$` : `^${re}(?:/.*)?$`);
 }
 
-/** The test files `glob` selects (all when `glob` is null). */
+/**
+ * A `--tests` value split into its globs: top-level commas separate them
+ * (`a/**,b/**` = `{a,b}/**`); commas inside `{...}` stay in their glob.
+ */
+export function splitGlobList(glob) {
+  const out = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of String(glob)) {
+    if (ch === '{') depth += 1;
+    else if (ch === '}' && depth > 0) depth -= 1;
+    if (ch === ',' && depth === 0) {
+      out.push(current);
+      current = '';
+    } else current += ch;
+  }
+  out.push(current);
+  return out.map((g) => g.trim()).filter(Boolean);
+}
+
+/** The test files `glob` selects (all when `glob` is null); a comma-separated list selects the union. */
 export function selectTestFiles(files, glob) {
   if (!glob) return files;
-  const re = globToRegExp(glob);
-  return files.filter((f) => re.test(f));
+  const res = splitGlobList(glob).map(globToRegExp);
+  return files.filter((f) => res.some((re) => re.test(f)));
 }
 
 const sqlString = (s) => `'${String(s).replace(/'/g, "''")}'`;

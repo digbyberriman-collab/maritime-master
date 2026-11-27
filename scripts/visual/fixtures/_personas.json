@@ -1,6 +1,6 @@
 {
   "vessel-master": {
-    "note": "The DRAAK master: legacy role master, RBAC captain (the catalogue's vessel master role) on DRAAK only, no fleet-wide role, assigned to DRAAK. No fleet reach (D-26): no Fleet scope anywhere.",
+    "note": "The DRAAK master: legacy role master, RBAC captain (the catalogue's vessel master role) on DRAAK only, no fleet-wide role, assigned to DRAAK. No fleet reach (D-26): no Fleet scope anywhere. Phase 3 wave 1: crew roster admin (hours of rest approval and final approval, X1-08/08B) and crew certificates edit on DRAAK (document verification, X1-05).",
     "auth": {
       "id": "a0000000-0000-4000-8000-000000000011",
       "email": "master.11@demo-fleet.example",
@@ -64,7 +64,7 @@
         },
         {
           "module_key": "crew_roster",
-          "permission": "edit",
+          "permission": "admin",
           "scope": "vessel",
           "restrictions": {},
           "source": "role"
@@ -78,6 +78,13 @@
         },
         {
           "module_key": "vessel_certificates",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "crew_certificates",
           "permission": "edit",
           "scope": "vessel",
           "restrictions": {},

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "f1000000-0000-4000-8000-000000000015",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "profile_id": "b0000000-0000-4000-8000-000000000015",
+    "first_name": "Demo",
+    "last_name": "Chief Stew",
+    "preferred_name": null,
+    "person_type": "crew",
+    "is_active": true,
+    "consent_share_safety_flags": true,
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "created_at": "$ts:-200d",
+    "updated_at": "$ts:-20d"
+  }
+]

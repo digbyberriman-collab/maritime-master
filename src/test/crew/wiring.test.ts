@@ -35,10 +35,25 @@ const crewMigrationFiles = readdirSync(join(ROOT, 'supabase/migrations'))
   .filter((f) => /^2026112406\d{4}_crew_[a-z0-9_]+\.sql$/.test(f))
   .sort();
 const crewMigrations = crewMigrationFiles.map((f) => read(`supabase/migrations/${f}`)).join('\n');
+const crewFunctionNames = new Set(Array.from(crewMigrations.matchAll(/CREATE OR REPLACE FUNCTION public\.([a-z0-9_]+)\(/g)).map((m) => m[1]));
+const crewRelationNames = new Set(
+  Array.from(crewMigrations.matchAll(/CREATE (?:TABLE IF NOT EXISTS|OR REPLACE VIEW) public\.([a-z0-9_]+)[\s(]/g)).map((m) => `public.${m[1]}`),
+);
 const types = read('src/integrations/supabase/types.ts');
-const contractMap = JSON.parse(read('scripts/db/contract-map.d/crew.json'));
-const grants = JSON.parse(read('supabase/tests/fixtures/function-grants.d/crew.json'));
-const ledger = read('supabase/MIGRATIONS-LEDGER.d/crew.md');
+// The crew contract-map and grants fragments were folded into the main inventories at the wave-1 merge.
+const contractMap = JSON.parse(read('scripts/db/contract-map.json'));
+const allGrants = JSON.parse(read('supabase/tests/fixtures/function-grants.json')) as {
+  functions: Record<string, string[]>;
+  relations: Record<string, unknown>;
+};
+const grants = {
+  functions: Object.fromEntries(
+    Object.entries(allGrants.functions).filter(([k]) => crewFunctionNames.has(k.replace(/^public\.([a-z0-9_]+)\(.*$/, '$1'))),
+  ),
+  relations: Object.fromEntries(Object.entries(allGrants.relations).filter(([k]) => crewRelationNames.has(k))),
+};
+// The crew ledger fragment was folded into the main ledger at the wave-1 merge (rows 59 to 70, queue orders 37 to 48 = C1 to C12).
+const ledger = read('supabase/MIGRATIONS-LEDGER.md');
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -89,6 +104,8 @@ describe('pending types and the migrations', () => {
       // Familiarisation (X1-10): its types are the training module's pending file.
       '20261124061000_crew_familiarisation.sql',
       '20261124061100_crew_transfers_employment.sql',
+      // Crew import staging tenancy (X1-13): its types are the rotation planner's pending file.
+      '20261124061200_crew_import_tenancy.sql',
     ]);
   });
 
@@ -107,7 +124,7 @@ describe('pending types and the migrations', () => {
     expect(entry?.tables).toEqual({ type: 'CrewPendingTables', expect: pendingTables });
     expect(entry?.functions).toEqual({ type: 'CrewPendingFunctions', expect: pendingFunctions });
     expect(entry?.views).toEqual({ type: 'CrewPendingViews', expect: pendingViews });
-    expect(Object.keys(contractMap.notMirrored.functions).sort()).toEqual([
+    expect(Object.keys(contractMap.notMirrored.functions).filter((k) => crewFunctionNames.has(k)).sort()).toEqual([
       'crew_caller_is_external', 'crew_cap_vessel_ids', 'crew_compliance_summary_rows', 'crew_document_visible_profile_ids', 'crew_profile_visible',
       'crew_requirement_status_rows', 'crew_vessel_cap', 'crew_visible_profile_ids',
     ]);
@@ -115,33 +132,22 @@ describe('pending types and the migrations', () => {
   });
 
   it('every function the crew migrations create has a grants entry, and every table and view its relation entry', () => {
-    const fns = Array.from(new Set(Array.from(crewMigrations.matchAll(/CREATE OR REPLACE FUNCTION public\.([a-z0-9_]+)\(/g)).map((m) => m[1]))).sort();
+    const fns = [...crewFunctionNames].sort();
     const granted = Object.keys(grants.functions).map((k) => k.replace(/^public\.([a-z0-9_]+)\(.*$/, '$1')).sort();
     expect(granted).toEqual(fns);
-    const tables = Array.from(crewMigrations.matchAll(/CREATE (?:TABLE IF NOT EXISTS|OR REPLACE VIEW) public\.([a-z0-9_]+)[ (]/g)).map((m) => `public.${m[1]}`).sort();
+    const tables = Array.from(crewMigrations.matchAll(/CREATE (?:TABLE IF NOT EXISTS|OR REPLACE VIEW) public\.([a-z0-9_]+)[\s(]/g)).map((m) => `public.${m[1]}`).sort();
     expect(Object.keys(grants.relations).sort()).toEqual(tables);
     for (const key of Object.keys(grants.functions)) expect(grants.functions[key], key).not.toContain('anon');
   });
 
-  it('the ledger fragment lists each file with a check query and an apply-queue row', () => {
-    expect(ledger).toContain('| 1 | `20261124060100_crew_reference_positions.sql` | written, not applied |');
-    expect(ledger).toContain('| C1 | `20261124060100_crew_reference_positions.sql` | Query C1 |');
-    expect(ledger).toMatch(/-- C1\. crew_reference_positions/);
-    expect(ledger).toContain('| 2 | `20261124060200_crew_vessel_list.sql` | written, not applied |');
-    expect(ledger).toContain('| C2 | `20261124060200_crew_vessel_list.sql` | Query C2 |');
-    expect(ledger).toMatch(/-- C2\. crew_vessel_list/);
-    expect(ledger).toContain('| 3 | `20261124060300_crew_profile_details.sql` | written, not applied |');
-    expect(ledger).toContain('| C3 | `20261124060300_crew_profile_details.sql` | Query C3 |');
-    expect(ledger).toMatch(/-- C3\. crew_profile_details/);
-    expect(ledger).toContain('| 4 | `20261124060400_crew_document_catalogue.sql` | written, not applied |');
-    expect(ledger).toContain('| C4 | `20261124060400_crew_document_catalogue.sql` | Query C4 |');
-    expect(ledger).toMatch(/-- C4\. crew_document_catalogue/);
-    expect(ledger).toContain('| 5 | `20261124060500_crew_document_verification.sql` | written, not applied |');
-    expect(ledger).toContain('| C5 | `20261124060500_crew_document_verification.sql` | Query C5 |');
-    expect(ledger).toMatch(/-- C5\. crew_document_verification/);
-    expect(ledger).toContain('| 6 | `20261124060600_crew_compliance.sql` | written, not applied |');
-    expect(ledger).toContain('| C6 | `20261124060600_crew_compliance.sql` | Query C6 |');
-    expect(ledger).toMatch(/-- C6\. crew_compliance/);
+  it('the ledger lists each crew file with a check query and an apply-queue row (folded at the wave-1 merge)', () => {
+    crewMigrationFiles.forEach((file, i) => {
+      const n = i + 1;
+      const topic = file.replace(/^\d{14}_crew_/, 'crew_').replace(/\.sql$/, '');
+      expect(ledger, file).toContain(`| ${58 + n} | \`${file}\` | written, not applied |`);
+      expect(ledger, file).toContain(`| ${36 + n} (C${n}) | \`${file}\` | Query C${n} |`);
+      expect(ledger, file).toMatch(new RegExp(`-- C${n}\\. ${topic}`));
+    });
   });
 
   it('the compliance parity fixture is the one both test suites read (X1-06)', () => {

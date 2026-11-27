@@ -42,7 +42,7 @@ Never start ad-hoc clusters on fixed ports: the harness picks a free port and a 
 | (none) | full run: discover -> cluster -> stub -> legacy replay -> fidelity -> build-out pass 1 and pass 2 -> test library -> contract check -> SQL tests -> teardown |
 | `--replay-only` | stop after the legacy replay and the fidelity check |
 | `--file <migration>` | build-out files up to and including `<migration>` once, then `<migration>` again; the SQL tests still run unless `--no-tests` |
-| `--tests <glob>` | only the SQL test files matching the glob, relative to `supabase/tests/sql/` (`**` any depth, `*` one segment, `{a,b}`; a bare directory name selects everything under it) |
+| `--tests <glob>` | only the SQL test files matching the glob, relative to `supabase/tests/sql/` (`**` any depth, `*` one segment, `{a,b}`; a bare directory name selects everything under it; a comma-separated list such as `'p4_files/**,p5_notifications/**'` selects the union) |
 | `--no-tests`, `--no-fidelity`, `--no-contract` | skip that phase (never in CI) |
 | `--keep` | keep the cluster; prints `psql -h <socket dir> -p <port> -U postgres storm`, the data directory and the stop command |
 | `--report <path>` | JSON report path (default `$TMPDIR/storm-db-report.json`); a path inside the repo is refused |

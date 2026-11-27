@@ -88,7 +88,7 @@ describe('the Fleet sidebar', () => {
     expect(headingsOf(nav)).toEqual(['Overview', 'Compliance', 'People', 'Workspaces', 'Administration', 'Configuration']);
     const heading = within(nav).getByText('Overview');
     expect(heading).toHaveClass('type-eyebrow', 'text-sidebar-muted-foreground');
-    const dashboard = within(nav).getByRole('link', { name: /^Dashboard, current page/ });
+    const dashboard = within(nav).getByRole('link', { name: /^Dashboard(, beta)?, current page/ });
     expect(dashboard).toHaveAttribute('aria-current', 'page');
     expect(dashboard).toHaveClass('bg-sidebar-accent', 'text-sidebar-primary');
   });
@@ -104,7 +104,7 @@ describe('the vessel sidebar', () => {
     renderSidebar('/v/dra/crew/list', VESSEL);
     const nav = await screen.findByRole('navigation', { name: 'Crew folders' });
     await waitFor(() => expect(within(nav).getByRole('link', { name: /^Leave/ })).toHaveAttribute('href', '/v/dra/crew/planner'));
-    expect(within(nav).getByRole('link', { name: /^Crew List, current page/ })).toHaveAttribute('href', '/v/dra/crew/list');
+    expect(within(nav).getByRole('link', { name: /^Crew List(, beta)?, current page/ })).toHaveAttribute('href', '/v/dra/crew/list');
     expect(within(nav).queryByRole('link', { name: /^Planner/ })).toBeNull();
     expect(within(nav).queryByRole('link', { name: /^Drills/ })).toBeNull();
     expect(within(nav).queryByRole('link', { name: /^Home/ })).toBeNull();

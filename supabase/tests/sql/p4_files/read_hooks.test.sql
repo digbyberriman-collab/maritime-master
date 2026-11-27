@@ -41,6 +41,10 @@ SELECT tests.ok(position('storage_path_read_hooks' IN pg_get_functiondef('public
 
 -- ------------------------------------------------------------ predicate missing: unchanged
 
+-- X5's real predicate (20261124040400) is in the build-out. This rolled-back file drops it, so
+-- the sections below test the hook itself; fleet/documents_acks covers the real predicate.
+SELECT tests.reset_role();
+DROP FUNCTION IF EXISTS public.fleet_document_file_readable(uuid, uuid);
 SELECT tests.ok(to_regprocedure('public.fleet_document_file_readable(uuid,uuid)') IS NULL, 'setup: the fleet document predicate is not in the database');
 SELECT tests.as_user(tests.user_id('A.crew_dra'));
 SELECT tests.ok(NOT public.storage_path_allowed('records', tests.fd_path(:'ca', :'doc_pub', 1), false), 'no predicate: vessel crew cannot read a fleet document path (as before)');

@@ -156,7 +156,8 @@ describe('Fleet scope reachability', () => {
     const leaf = navLeaves(fleetModule).find((l) => l.label === 'Reports');
     expect(leaf?.path).toBe('/fleet/reports');
     expect(resolveUrl(routes, '/fleet/reports')).toMatchObject({ pattern: '/fleet/reports', hops: [] });
-    const reports = fleetPages.filter((p) => p.startsWith('/fleet/reports/'));
+    // The reports module's own report route (/fleet/reports/:reportKey, X5-03A) is reachable through the hub.
+    const reports = fleetPages.filter((p) => p.startsWith('/fleet/reports/') && !p.includes(':'));
     expect(reports.map((p) => p.slice('/fleet/reports/'.length)).sort()).toEqual([...LEGACY_REPORT_PATHS].sort());
   });
 });

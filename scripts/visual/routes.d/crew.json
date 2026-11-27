@@ -466,10 +466,10 @@
     "note": "X1-06B: the legacy crew certificates URL lands on the Documents view of Crew Compliance (?view=documents) on the person's vessel"
   },
   {
-    "path": "/v/dra/crew/familiarisation",
+    "path": "/ism/training",
     "slug": "crew-familiarisation-course-records",
     "waitFor": "[data-training-compliance-pointer]",
-    "note": "X1-06B: Training is no longer a compliance source: the pointer to Crew Compliance, and the Course records tab (records by course, no compliance score)",
+    "note": "X1-06B: Training is no longer a compliance source: the pointer to Crew Compliance, and the Course records tab (records by course, no compliance score). X1-10 gave the vessel Familiarisation leaf its own page, so this page is captured where it still renders, /ism/training",
     "actions": [
       {
         "click": "[role=\"tab\"]:has-text(\"Course records\")"
@@ -482,12 +482,14 @@
   {
     "path": "/me/hours-of-rest?view=week",
     "slug": "hor-me-week",
+    "persona": "crew-bosun",
     "waitFor": "[data-week-view]",
     "note": "X1-07B: the Week view: the week's days, each with its state and a timeline that edits in place"
   },
   {
     "path": "/me/hours-of-rest?view=day",
     "slug": "hor-me-day-keyboard",
+    "persona": "crew-bosun",
     "waitFor": "[data-day-editor]",
     "note": "X1-07B: the day editor with its periods list and Add period; the timeline focused from the keyboard (cursor and ring), one quarter hour switched with Space, the unsaved-changes bar",
     "actions": [
@@ -511,6 +513,7 @@
   {
     "path": "/me/hours-of-rest",
     "slug": "hor-me-fill",
+    "persona": "crew-bosun",
     "waitFor": "[data-hor-fill]",
     "note": "X1-07B: Fill days: copy the day before, a day of the month or a watch pattern onto a range of days, with what it will fill",
     "actions": [
@@ -732,6 +735,99 @@
       },
       {
         "waitFor": "[data-assignments-table] input[aria-label=\"Position\"]"
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/list",
+    "slug": "crew-transfer-details",
+    "waitFor": "button[aria-label=\"Transfer Bosun, Demo\"]",
+    "note": "X1-11: the transfer wizard, step 1 (destination with fleet approval, same or new position, dates, notes)",
+    "actions": [
+      {
+        "click": "button[aria-label=\"Transfer Bosun, Demo\"]"
+      },
+      {
+        "waitFor": "[data-transfer-step=\"details\"]"
+      },
+      {
+        "wait": 500
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/list",
+    "slug": "crew-transfer-review",
+    "waitFor": "button[aria-label=\"Transfer Bosun, Demo\"]",
+    "note": "X1-11: step 2, the pre-transfer review (worst first, every item ticked)",
+    "actions": [
+      {
+        "click": "button[aria-label=\"Transfer Bosun, Demo\"]"
+      },
+      {
+        "waitFor": "[data-transfer-step=\"details\"]"
+      },
+      {
+        "click": "[data-transfer-step=\"details\"] button[type=\"submit\"]"
+      },
+      {
+        "waitFor": "[data-transfer-step=\"review\"]"
+      },
+      {
+        "wait": 500
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/list",
+    "slug": "crew-transfer-status",
+    "waitFor": "button[aria-label=\"Transfer Bosun, Demo\"]",
+    "note": "X1-11: step 3, the status (pending fleet approval; the submitter sees why another approver decides)",
+    "actions": [
+      {
+        "click": "button[aria-label=\"Transfer Bosun, Demo\"]"
+      },
+      {
+        "waitFor": "[data-transfer-step=\"details\"]"
+      },
+      {
+        "click": "[data-transfer-step=\"details\"] button[type=\"submit\"]"
+      },
+      {
+        "waitFor": "[data-transfer-step=\"review\"]"
+      },
+      {
+        "click": "[data-review-item=\"requirement:f1100000-0000-4000-8000-0000000000c1\"] button[role=\"checkbox\"]"
+      },
+      {
+        "click": "[data-review-item=\"medical:follow_up\"] button[role=\"checkbox\"]"
+      },
+      {
+        "click": "[data-review-item=\"hours_of_rest:breaches\"] button[role=\"checkbox\"]"
+      },
+      {
+        "click": "[data-review-item=\"familiarisation_required\"] button[role=\"checkbox\"]"
+      },
+      {
+        "click": "[data-review-item=\"appraisal:last\"] button[role=\"checkbox\"]"
+      },
+      {
+        "click": "[data-review-item=\"requirement:f1100000-0000-4000-8000-0000000000c1\"] button:has-text(\"Add a note\")"
+      },
+      {
+        "type": {
+          "selector": "[data-review-item=\"requirement:f1100000-0000-4000-8000-0000000000c1\"] input",
+          "text": "Booked on the course before sign-on."
+        }
+      },
+      {
+        "click": "[data-transfer-step=\"review\"] button[type=\"submit\"]"
+      },
+      {
+        "waitFor": "[data-transfer-step=\"status\"]"
+      },
+      {
+        "wait": 500
       }
     ]
   }

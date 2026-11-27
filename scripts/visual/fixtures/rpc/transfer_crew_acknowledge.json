@@ -1,0 +1,132 @@
+{
+  "id": "f1100000-0000-4000-8000-000000000001",
+  "status": "review",
+  "profile_id": "b0000000-0000-4000-8000-000000000014",
+  "user_id": "a0000000-0000-4000-8000-000000000014",
+  "person": {
+    "first_name": "Demo",
+    "preferred_name": null,
+    "last_name": "Bosun"
+  },
+  "from_vessel": {
+    "id": "e0000000-0000-4000-8000-000000000001",
+    "name": "DRAAK",
+    "code": "DRA"
+  },
+  "to_vessel": {
+    "id": "e0000000-0000-4000-8000-000000000007",
+    "name": "HYDRA",
+    "code": "HYD"
+  },
+  "from_position": {
+    "id": "531730fb-95cb-133d-47dd-40c75b8d61ff",
+    "name": "Bosun"
+  },
+  "to_position": {
+    "id": "f1100000-0000-4000-8000-0000000000a1",
+    "name": "Bosun"
+  },
+  "same_role": true,
+  "sign_off_date": "$date:+7",
+  "sign_on_date": "$date:+8",
+  "requires_approval": false,
+  "review": {
+    "generated_at": "$ts:-4m",
+    "items": [
+      {
+        "key": "requirement:f1100000-0000-4000-8000-0000000000c1",
+        "kind": "requirement",
+        "severity": "danger",
+        "title": "Proficiency in Security Awareness is missing",
+        "detail": "HYDRA requires it of a Bosun. Nothing on file satisfies it.",
+        "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e61"
+      },
+      {
+        "key": "medical:follow_up",
+        "kind": "medical",
+        "severity": "warning",
+        "title": "Open medical follow-up",
+        "detail": "A consultation still has a follow-up. Ask the medical officer whether it affects the transfer; the details stay in Health.",
+        "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e62"
+      },
+      {
+        "key": "hours_of_rest:breaches",
+        "kind": "hours_of_rest",
+        "severity": "warning",
+        "title": "2 hours-of-rest breaches in the last 30 days",
+        "detail": "Plan rest before the first watch on the new vessel.",
+        "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e63"
+      },
+      {
+        "key": "familiarisation_required",
+        "kind": "familiarisation_required",
+        "severity": "info",
+        "title": "3 familiarisations open on joining",
+        "detail": "HYDRA asks a Bosun to complete them after joining.",
+        "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e64"
+      },
+      {
+        "key": "appraisal:last",
+        "kind": "appraisal",
+        "severity": "info",
+        "title": "Last performance review on 12 Jun 2026",
+        "detail": "Share it with the new Master if it helps the handover.",
+        "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e65"
+      }
+    ]
+  },
+  "acknowledgements": [
+    {
+      "key": "requirement:f1100000-0000-4000-8000-0000000000c1",
+      "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e61",
+      "note": "Booked on the course before sign-on.",
+      "at": "$ts:-1m"
+    },
+    {
+      "key": "medical:follow_up",
+      "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e62",
+      "note": null,
+      "at": "$ts:-1m"
+    },
+    {
+      "key": "hours_of_rest:breaches",
+      "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e63",
+      "note": null,
+      "at": "$ts:-1m"
+    },
+    {
+      "key": "familiarisation_required",
+      "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e64",
+      "note": null,
+      "at": "$ts:-1m"
+    },
+    {
+      "key": "appraisal:last",
+      "fingerprint": "8d2c5a0e1f0b4b5f9c7e1a2b3c4d5e65",
+      "note": null,
+      "at": "$ts:-1m"
+    }
+  ],
+  "acknowledged": true,
+  "notes": "Relieving the HYDRA bosun for the yard period.",
+  "created_at": "$ts:-5m",
+  "created_by_name": "Demo Fleet Manager",
+  "submitted_at": null,
+  "submitted_by_name": null,
+  "approved_at": null,
+  "approved_by_name": null,
+  "decline_reason": null,
+  "cancelled_at": null,
+  "cancelled_by_name": null,
+  "cancelled_reason": null,
+  "completed_at": null,
+  "compliant_on_destination_at": null,
+  "rights": {
+    "can_edit": true,
+    "can_submit": true,
+    "can_decide": false,
+    "can_cancel": true,
+    "can_complete": false,
+    "decide_block": null
+  }
+}

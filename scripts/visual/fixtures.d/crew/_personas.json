@@ -939,5 +939,107 @@
       ],
       "has_capability": false
     }
+  },
+  "crew-bosun": {
+    "note": "X1-07B: the DRAAK bosun, crew on DRAAK only (legacy role crew, RBAC crew with crew roster view), entering his own hours of rest at /me/hours-of-rest: his assignment to DRAAK makes the month editable (Fill days, the day editor).",
+    "auth": {
+      "id": "a0000000-0000-4000-8000-000000000014",
+      "email": "bosun.14@demo-fleet.example",
+      "user_metadata": {
+        "first_name": "Demo",
+        "last_name": "Bosun"
+      }
+    },
+    "tables": {
+      "user_roles": [
+        {
+          "id": "93000000-0000-4000-8000-000000000014",
+          "user_id": "a0000000-0000-4000-8000-000000000014",
+          "company_id": "c0000000-0000-4000-8000-000000000001",
+          "role": "crew",
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "department": "deck",
+          "is_active": true,
+          "granted_at": "$ts:-300d",
+          "granted_by": null,
+          "expires_at": null,
+          "metadata": null,
+          "created_at": "$ts:-300d",
+          "updated_at": "$ts:-300d"
+        }
+      ]
+    },
+    "rpc": {
+      "get_user_roles_full": [
+        {
+          "role_id": "90000000-0000-4000-8000-000000000005",
+          "role_name": "crew",
+          "role_display_name": "Crew",
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "vessel_name": "DRAAK",
+          "department": "deck",
+          "is_fleet_wide": false
+        }
+      ],
+      "get_user_rbac_permissions": [
+        {
+          "module_key": "dashboard",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "vessels",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "documents",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "training",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "crew",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "drills",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "forms",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "crew_roster",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        }
+      ],
+      "has_capability": false
+    }
   }
 }

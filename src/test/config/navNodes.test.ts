@@ -52,7 +52,9 @@ describe('nav node fields', () => {
     expect(find(module('vessel').children, 'Summary')?.status).toBe('planned');
     expect(find(module('fleet').children, 'Safety queue')?.status).toBe('planned');
     expect(find(module('vessel').children, 'Drills')?.status).toBe('live');
-    expect(find(module('fleet').children, 'Dashboard')?.status).toBe('live');
+    expect(find(module('fleet').children, 'Tracker')?.status).toBe('live');
+    // A rebuilt Phase 3 page goes live as beta behind its capability (X5-02A).
+    expect(find(module('fleet').children, 'Dashboard')).toMatchObject({ status: 'beta', capability: 'fleet.operations.fleet_dashboard.view' });
   });
 
   it('every placeholder belongs to a planned leaf', () => {

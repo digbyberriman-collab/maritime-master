@@ -17,7 +17,9 @@
  * fragments; a fragment lists only files of its block, blocks never
  * overlap, and every fragment row has exactly one Apply queue row in that
  * fragment, ordered <prefix>1, <prefix>2, … (no file of a fragment is in
- * the main queue). The integrator folds the fragments back at the wave merge.
+ * the main queue). The integrator folds the fragments back at the wave merge
+ * (wave 1's crew and fleet fragments were folded on 27 Nov 2026; the
+ * mechanism stays for the next waves' streams).
  *
  * Every file from the build-out (version >= 20261123000000) is also
  * idempotent and safe, because the owner applies it by hand and Lovable may
@@ -647,10 +649,18 @@ describe('migrations ledger (gap/00 E2, D-01)', () => {
     expect(mainRows.length).toBeGreaterThanOrEqual(27);
   });
 
-  it('reads the per-stream fragments (crew and fleet in Phase 3 wave 1)', () => {
-    expect(fragments.map((f) => f.name)).toEqual(expect.arrayContaining(['crew.md', 'fleet.md']));
-    expect(fragments.find((f) => f.name === 'crew.md')).toMatchObject({ block: '2026112406', queuePrefix: 'C' });
-    expect(fragments.find((f) => f.name === 'fleet.md')).toMatchObject({ block: '2026112404', queuePrefix: 'F' });
+  it('folded the Phase 3 wave 1 fragments (crew and fleet) into the main ledger at the merge', () => {
+    expect(fragments.map((f) => f.name)).not.toContain('crew.md');
+    expect(fragments.map((f) => f.name)).not.toContain('fleet.md');
+    const queued = queueRows(mainText);
+    for (const block of ['2026112404', '2026112406']) {
+      const blockFiles = handWritten.filter((f) => f.startsWith(block));
+      expect(blockFiles.length, block).toBeGreaterThan(0);
+      for (const f of blockFiles) {
+        expect(mainRows.some((r) => r.file === f), f).toBe(true);
+        expect(queued.filter((q) => q.file === f).length, f).toBe(1);
+      }
+    }
   });
 
   it('keeps each fragment to its block, with one Apply queue row per file in prefix order', () => {

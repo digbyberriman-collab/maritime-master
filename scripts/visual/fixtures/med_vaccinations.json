@@ -1,0 +1,90 @@
+[
+  {
+    "id": "f6000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vaccine": "Yellow fever",
+    "dose_label": null,
+    "administered_on": "$date:-2400",
+    "valid_until": null,
+    "exemption_reason": null,
+    "is_required": true
+  },
+  {
+    "id": "f6000000-0000-4000-8000-000000000002",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vaccine": "Tetanus / diphtheria / polio",
+    "dose_label": "Booster",
+    "administered_on": "$date:-1500",
+    "valid_until": null,
+    "exemption_reason": null,
+    "is_required": true
+  },
+  {
+    "id": "f6000000-0000-4000-8000-000000000003",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vaccine": "Typhoid",
+    "dose_label": null,
+    "administered_on": "$date:-1120",
+    "valid_until": null,
+    "exemption_reason": null,
+    "is_required": false
+  },
+  {
+    "id": "f6000000-0000-4000-8000-000000000004",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vaccine": "Hepatitis A and B",
+    "dose_label": "Dose 3",
+    "administered_on": "$date:-900",
+    "valid_until": null,
+    "exemption_reason": null,
+    "is_required": false
+  },
+  {
+    "id": "f6000000-0000-4000-8000-000000000005",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vaccine": "Influenza",
+    "dose_label": null,
+    "administered_on": "$date:-340",
+    "valid_until": null,
+    "exemption_reason": null,
+    "is_required": false
+  },
+  {
+    "id": "f6000000-0000-4000-8000-000000000006",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vaccine": "COVID-19",
+    "dose_label": null,
+    "administered_on": "$date:-400",
+    "valid_until": null,
+    "exemption_reason": null,
+    "is_required": false
+  },
+  {
+    "id": "f6000000-0000-4000-8000-000000000007",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vaccine": "MMR",
+    "dose_label": "Dose 2",
+    "administered_on": null,
+    "valid_until": null,
+    "exemption_reason": null,
+    "is_required": false
+  },
+  {
+    "id": "f6000000-0000-4000-8000-000000000008",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "person_id": "f1000000-0000-4000-8000-000000000015",
+    "vaccine": "Shingles",
+    "dose_label": null,
+    "administered_on": "$date:-200",
+    "valid_until": null,
+    "exemption_reason": null,
+    "is_required": false
+  }
+]

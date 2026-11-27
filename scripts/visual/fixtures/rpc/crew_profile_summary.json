@@ -32,6 +32,17 @@
     "is_own": false,
     "can_edit": true,
     "can_edit_self": true,
-    "tabs": ["personal", "contact"]
+    "tabs": [
+      "personal",
+      "contact",
+      "documents",
+      "stcw",
+      "qualifications",
+      "training",
+      "hours-of-rest",
+      "employment",
+      "medical",
+      "activity"
+    ]
   }
 ]

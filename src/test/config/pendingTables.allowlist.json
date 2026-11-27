@@ -30,13 +30,8 @@
     "src/modules/refit/pages/search.tsx": 9,
     "src/modules/refit/pages/snags.tsx": 2,
     "src/modules/refit/pages/works.tsx": 2,
-    "src/modules/rotation-planner/components/ImportDialog.tsx": 8,
-    "src/modules/rotation-planner/hooks/usePlannerData.ts": 12,
     "src/modules/settings/components/sections/AuditModeSection.tsx": 7,
     "src/modules/settings/components/sections/NotificationsSection.tsx": 2,
-    "src/modules/settings/components/sections/PermissionsSection.tsx": 13,
-    "src/modules/work-rest/pages/MyWorkRestMonth.tsx": 1,
-    "src/modules/work-rest/services/workRestService.ts": 1,
     "src/shared/hooks/useCrewEditAccess.ts": 1
   }
 }

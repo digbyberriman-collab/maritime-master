@@ -1,3 +1,5 @@
 {
-  "missingTables": []
+  "missingTables": [
+    "user_signature_images"
+  ]
 }

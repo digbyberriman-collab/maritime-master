@@ -131,7 +131,8 @@ describe('SidebarNavigation accessibility regressions', () => {
     renderSidebar('/v/dra/logbooks/review?module=vessel');
     const crew = screen.getByRole('button', { name: /Crew section, collapsed/i });
     activateWithKeyboard(crew);
-    const crewList = await screen.findByRole('link', { name: 'Crew List' });
+    // Crew List is beta (X1-02): the mark is part of its accessible name.
+    const crewList = await screen.findByRole('link', { name: 'Crew List, beta' });
 
     expect(crewList.className).toContain('focus-visible:ring-2');
     activateWithKeyboard(crewList);

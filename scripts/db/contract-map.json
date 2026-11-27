@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "The pending-type contract of Phase 2 (spec §B.1, §D.7): which TypeScript files and type names mirror the build-out schema, and the objects each must declare. scripts/db/check-pending-contract.mjs reads this map with a TypeScript Program + TypeChecker ('@/' -> src/) and compares it with the harness export of scripts/db/schema-export.mjs. Lane 1 owns this file; the TS files belong to Lane 2 and are never edited by the checker.",
+  "description": "The pending-type contract of Phase 2 (spec §B.1, §D.7): which TypeScript files and type names mirror the build-out schema, and the objects each must declare. scripts/db/check-pending-contract.mjs reads this map with a TypeScript Program + TypeChecker ('@/' -> src/) and compares it with the harness export of scripts/db/schema-export.mjs. Lane 1 owns this file; the TS files belong to Lane 2 and are never edited by the checker. While two streams build at once, each keeps its entries in scripts/db/contract-map.d/<stream>.json (merged by the checker) and the integrator folds them in here at the wave merge (Phase 3 wave 1: folded on 27 Nov 2026).",
   "files": [
     {
       "file": "src/modules/vessels/types/db.pending.ts",
@@ -49,13 +49,200 @@
       "mirrors": "spec §A.15",
       "tables": { "type": "NotificationsPendingTables", "expect": ["notification_inbox"] },
       "functions": { "type": "NotificationsPendingFunctions", "expect": ["notification_inbox_mark_all_read"] }
+    },
+    {
+      "file": "src/modules/crew/types/db.pending.ts",
+      "mirrors": "X1 spec §6 060100 (X1-01: reference data, positions, position manning), 060200 (X1-02: vessel crew list, movements, transfers table), 060300 (X1-03: personal details, languages, employment terms, next-of-kin phone columns, profile RPCs), 060400 (X1-04: document catalogue, vessel crew settings, crew document columns, document RPCs), 060500 (X1-05: document versions, review rights, verify, alerts off and on, renew), 060600 (X1-06: requirement rows, options and positions, the compliance views, the compliance and configuration RPCs) and 061100 (X1-11: the probation and notice columns of crew_contracts; the transfer RPCs: options, start, review, acknowledge, submit, decide, cancel, the one completion definer transfer_crew, one transfer and a person's transfers; the employment RPCs: end employment, the vessel's employment history and the re-hire prefill)",
+      "tables": { "type": "CrewPendingTables", "expect": ["ref_countries", "ref_languages", "departments", "contract_types", "positions", "position_aliases", "position_manning", "crew_movements", "crew_transfers", "crew_personal_details", "crew_languages", "crew_assignment_terms", "crew_document_categories", "crew_document_types", "crew_document_type_satisfies", "vessel_crew_settings", "crew_document_versions", "crew_requirement_rows", "crew_requirement_options", "crew_requirement_positions"] },
+      "views": { "type": "CrewPendingViews", "expect": ["crew_requirement_status", "crew_compliance_summary"] },
+      "columns": { "type": "CrewPendingColumns", "expect": ["crew_next_of_kin", "crew_certificates", "crew_contracts"] },
+      "functions": { "type": "CrewPendingFunctions", "expect": ["crew_positions_for_vessel", "crew_vessel_unmatched_titles", "crew_position_create", "crew_vessel_positions_save", "crew_position_alias_set", "crew_vessel_list", "crew_vessel_movements", "crew_profile_resolve", "crew_profile_summary", "crew_personal_details_save", "crew_languages_save", "crew_onboarding_save", "crew_find_duplicates", "crew_documents_for_profile", "crew_document_rights", "crew_document_save", "crew_document_delete", "crew_document_issuing_suggestions", "crew_document_review_rights", "crew_document_verify", "crew_document_mute", "crew_document_unmute", "crew_document_renew", "crew_vessel_compliance", "crew_vessel_requirement_status", "crew_compliance_for_vessels", "crew_requirements_config", "crew_requirement_row_save", "crew_requirement_row_delete", "crew_requirement_cell_set", "crew_requirement_row_bulk", "crew_requirements_add_stcw_basic", "crew_vessel_set_passenger", "crew_vessel_settings_save", "crew_document_type_create", "crew_document_type_satisfies_save", "transfer_crew_options", "transfer_crew_start", "transfer_crew_review", "transfer_crew_acknowledge", "transfer_crew_submit", "transfer_crew_decide", "transfer_crew_cancel", "transfer_crew", "transfer_crew_detail", "crew_transfers_for_profile", "crew_end_employment", "crew_vessel_employment_history", "crew_rehire_prefill"] }
+    },
+    {
+      "file": "src/modules/work-rest/types/db.pending.ts",
+      "mirrors": "X1 spec §6 060700 (X1-07: the hours-of-rest engine: vessel settings margins, serious thresholds, HoD step and reminders, month signer columns, breach day, serious flag, deficit and review columns, stale signatures, and the save, fill and month RPCs) and 060800 (X1-08: the reminder log, the breach reports, the breach review view for fleet operations R9, and the board, month statistics, breach list, review, reminder and breach report RPCs)",
+      "tables": { "type": "WorkRestPendingTables", "expect": ["work_rest_reminders", "work_rest_breach_reports"] },
+      "views": { "type": "WorkRestPendingViews", "expect": ["work_rest_breach_reviews"] },
+      "columns": { "type": "WorkRestPendingColumns", "expect": ["vessel_work_rest_settings", "work_rest_monthly_submissions", "work_rest_non_conformities", "work_rest_signatures"] },
+      "functions": { "type": "WorkRestPendingFunctions", "expect": ["work_rest_save_day", "work_rest_fill_days", "work_rest_month_transition", "work_rest_vessel_board", "work_rest_month_stats", "work_rest_vessel_breaches", "work_rest_review_breach", "work_rest_remind", "work_rest_breach_report_recipients", "work_rest_breach_report_create"] }
+    },
+    {
+      "file": "src/modules/rotation-planner/types/db.pending.ts",
+      "mirrors": "X1 spec §6 060900 (X1-09: the planner server: the leave types, the request periods and the vessel's leave approval step, the period-store columns of frp_rotation_assignments, the day-code ownership columns of crew_leave_entries, the profile of crew_leave_requests, and the planner RPCs: the vessel's periods, period upsert and delete, Add leave, the crew's own request, the decision, the leave settings, the On/Off toggle and manning by day); X1 spec §6 061200 (X1-13: crew import staging tenancy: the company column of crew_import and vessels_import, and crew_import_stage, the browser's only staging write; the redefined live sync_crew_import_to_profiles and the crew_import_active view keep their generated types)",
+      "tables": { "type": "PlannerPendingTables", "expect": ["leave_types", "crew_leave_request_periods", "crew_leave_settings"] },
+      "columns": { "type": "PlannerPendingColumns", "expect": ["frp_rotation_assignments", "crew_leave_entries", "crew_leave_requests", "crew_import", "vessels_import"] },
+      "functions": { "type": "PlannerPendingFunctions", "expect": ["planner_vessel_periods", "planner_period_upsert", "planner_period_delete", "planner_add_leave", "crew_leave_request_submit", "crew_leave_request_decide", "planner_leave_settings_save", "crew_toggle_onboard", "vessel_manning_by_day", "crew_import_stage"] }
+    },
+    {
+      "file": "src/modules/training/types/db.pending.ts",
+      "mirrors": "X1 spec §6 061000 (X1-10: familiarisation per vessel and position: the required-positions table, the new template columns (company, code, description, due within, signature flags, scope, variant, form, updated), the new record columns (company, profile, due date, signature flags, signatures, reopen, created by), and the familiarisation RPCs: the vessel overview, one record, template save, start, tick, sign, reopen, delete; plus the onboarding-progress and crew dashboard reads X1-10B builds on)",
+      "tables": { "type": "TrainingPendingTables", "expect": ["familiarization_template_positions"] },
+      "columns": { "type": "TrainingPendingColumns", "expect": ["familiarization_templates", "familiarization_records"] },
+      "functions": { "type": "TrainingPendingFunctions", "expect": ["familiarisation_vessel_overview", "familiarisation_record_detail", "familiarisation_template_save", "familiarisation_start", "familiarisation_tick", "familiarisation_sign", "familiarisation_reopen", "familiarisation_delete", "crew_onboarding_progress", "crew_vessel_dashboard"] }
+    },
+    {
+      "file": "src/modules/fleet/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-01A (20261124040000_fleet_expiry_engine.sql) and X5-08 (20261124040700_fleet_medical_status.sql)",
+      "tables": {
+        "type": "FleetPendingTables",
+        "expect": ["expiry_window_rules", "fleet_medical_settings"]
+      },
+      "functions": {
+        "type": "FleetPendingFunctions",
+        "expect": [
+          "expiry_days_remaining",
+          "expiry_bucket",
+          "expiry_endorsement_state",
+          "expiry_default_window",
+          "expiry_window_for",
+          "set_expiry_window_rule",
+          "clear_expiry_window_rule",
+          "fleet_ops_can",
+          "fleet_expiry_items",
+          "fleet_expiry_summary",
+          "fleet_medical_settings_save",
+          "fleet_crew_medical_status"
+        ]
+      }
+    },
+    {
+      "file": "src/modules/dashboard/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-02A (20261124040100_fleet_dashboard_kpis.sql)",
+      "functions": {
+        "type": "DashboardPendingFunctions",
+        "expect": ["fleet_dashboard_kpis", "fleet_dashboard_panels", "fleet_vessel_comparison"]
+      }
+    },
+    {
+      "file": "src/modules/reports/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-03A (20261124040200_fleet_reports_hub.sql), X5-10A (20261124040900_fleet_report_crew_sources.sql) and X5-10B (20261124041000_fleet_report_ops_sources.sql)",
+      "functions": {
+        "type": "ReportsPendingFunctions",
+        "expect": [
+          "fleet_report_trends",
+          "fleet_vessel_list",
+          "fleet_report_crew_qualifications",
+          "fleet_report_hours_of_rest",
+          "fleet_report_contracts",
+          "fleet_report_overdue_drills",
+          "fleet_report_insurance",
+          "fleet_report_audits",
+          "fleet_report_work_list"
+        ]
+      }
+    },
+    {
+      "file": "src/modules/documents/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-04A (20261124040300_fleet_documents_library.sql) and X5-05A (20261124040400_fleet_documents_acknowledgements.sql)",
+      "tables": {
+        "type": "DocumentsPendingTables",
+        "expect": [
+          "fleet_document_sections",
+          "fleet_document_types",
+          "fleet_documents",
+          "fleet_document_versions",
+          "fleet_document_vessel_targets",
+          "fleet_document_events",
+          "fleet_document_acknowledgements",
+          "fleet_document_signer_rules",
+          "fleet_document_reminders"
+        ]
+      },
+      "functions": {
+        "type": "DocumentsPendingFunctions",
+        "expect": [
+          "fleet_document_section_save",
+          "fleet_document_sections_reorder",
+          "fleet_document_section_delete",
+          "fleet_document_type_save",
+          "fleet_document_type_delete",
+          "fleet_document_create",
+          "fleet_document_update",
+          "fleet_document_add_version",
+          "fleet_document_set_targets",
+          "fleet_document_publish",
+          "fleet_document_withdraw",
+          "fleet_document_delete_draft",
+          "fleet_document_vessel_documents",
+          "fleet_document_ack_status",
+          "fleet_document_summary",
+          "fleet_document_my_pending",
+          "fleet_document_acknowledge",
+          "fleet_document_acknowledge_witnessed",
+          "fleet_document_remind",
+          "fleet_document_set_signer_rule"
+        ]
+      }
+    },
+    {
+      "file": "src/modules/forms/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-06A (20261124040500_fleet_form_templates.sql)",
+      "tables": {
+        "type": "FormsPendingTables",
+        "expect": ["form_template_vessel_settings", "form_template_events"]
+      },
+      "columns": {
+        "type": "FormsPendingColumns",
+        "expect": ["form_templates"]
+      },
+      "functions": {
+        "type": "FormsPendingFunctions",
+        "expect": [
+          "form_template_publish",
+          "form_template_new_version",
+          "form_template_customise",
+          "form_template_archive",
+          "form_template_delete_draft",
+          "form_template_move_area",
+          "form_template_set_visibility",
+          "form_template_reorder",
+          "form_template_run_stats"
+        ]
+      }
+    },
+    {
+      "file": "src/modules/development/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-07A (20261124040600_fleet_training_core.sql)",
+      "tables": {
+        "type": "DevelopmentPendingTables",
+        "expect": ["development_application_events"]
+      },
+      "columns": {
+        "type": "DevelopmentPendingColumns",
+        "expect": ["development_courses", "development_applications", "program_settings"]
+      },
+      "functions": {
+        "type": "DevelopmentPendingFunctions",
+        "expect": [
+          "development_transition",
+          "development_course_save",
+          "development_course_archive",
+          "development_settings_save",
+          "development_course_promote"
+        ]
+      }
     }
   ],
   "notMirrored": {
     "tables": {
-      "notification_outbox": "service role only: the browser never reads it (spec §A.15, §B.1)"
+      "notification_outbox": "service role only: the browser never reads it (spec §A.15, §B.1)",
+      "crew_document_type_legacy_map": "Service-only mapping (20261124060400): legacy certificate strings to document types, read by the backfill and crew_certificates_guard; no browser grant",
+      "crew_document_expiry_notices": "Service-only bookkeeping (20261124060500): which recipient was told about which crew document at which expiry stage, written by crew_document_expiry_sweep; no browser grant",
+      "expiry_sources": "service-only registry of the expiry source views (D-X5-01, D-55): migrations and the service role write it, the fleet expiry definers read it; no browser grant"
     },
-    "views": {},
+    "views": {
+      "expiry_src_crew_documents": "X5 expiry source view (D-X5-01 contract, 20261124060400): read only by X5's definers (fleet_expiry_rows_for); no browser grant",
+      "crew_requirement_status_internal": "Internal engine view (X1-06, 20261124060600): crew_requirement_status_for() over every vessel (security invoker); service role only (REVOKEd from PUBLIC, anon and authenticated); its row type is the return type of crew_vessel_requirement_status (CrewRequirementStatusDbRow)",
+      "crew_compliance_summary_internal": "Internal engine view (X1-06, 20261124060600): crew_compliance_summary_for() over every vessel (security invoker); service role only; its row type is the return type of crew_vessel_compliance and crew_compliance_for_vessels (CrewComplianceSummaryDbRow)",
+      "expiry_src_vessel_certificates": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_insurance_policies": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_crew_certificates": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_profile_identity": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_work_authorisations": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_training_records": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_medical_fitness": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_crew_contracts": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant"
+    },
     "columns": {
       "admin_action_log.company_id": "server-side only: the service role and definers write the admin action log and no browser code reads it (20261123010400)"
     },
@@ -89,7 +276,19 @@
       "record_refusal": "pure helper of the record engine (builds a refusal result)",
       "record_slot_template_valid": "pure helper backing the record_kinds slot-template CHECK",
       "record_text_blank": "pure helper of the record engine (parity with the TS engines)",
-      "record_vessel_signatures_locked": "pure mirror of vesselSignaturesLocked() (D-51); the client has its TS original"
+      "record_vessel_signatures_locked": "pure mirror of vesselSignaturesLocked() (D-51); the client has its TS original",
+      "crew_vessel_cap": "RLS predicate and X1 definer gate (X1 spec §3, 20261124060100): text-first boolean the policies and every X1 definer call; the client gates with useCan() on the same capability keys",
+      "crew_cap_vessel_ids": "RLS helper (D-229, X1 spec §3, 20261124060100): the caller's vessels holding a capability key, computed once per statement in the X1 read policies; the browser does not call it",
+      "crew_caller_is_external": "RLS and RPC helper (D-229, X1 spec §3, 20261124060200): caller-only boolean the crew_movements / crew_transfers policies and the crew RPCs use to refuse external viewers; the browser does not call it",
+      "crew_profile_visible": "RLS and X1 definer helper (X1 spec §3, 20261124060300): one-argument boolean \"the caller may see this person\" the profile definers gate with; the page asks crew_profile_resolve / crew_profile_summary, which answer P0002 for an invisible person",
+      "crew_visible_profile_ids": "RLS helper (D-229, X1 spec §3, 20261124060300): the profiles the caller may see, computed once per statement in the crew_personal_details / crew_languages read policies; the browser does not call it",
+      "crew_document_visible_profile_ids": "RLS helper (D-229, X1 spec §3, 20261124060400): the profiles whose documents the caller may read, computed once per statement in the crew_certificates read policy; the browser does not call it",
+      "crew_requirement_status_rows": "Gated SRF (X1-06, 20261124060600; contract 5): the requirement status rows of the caller's crew_compliance.view vessels, read through the security-invoker view crew_requirement_status (declared in CrewPendingViews); the browser does not call it directly",
+      "crew_compliance_summary_rows": "Gated SRF (X1-06, 20261124060600; contract 5): the compliance summaries of the caller's crew_compliance.view vessels, read through the security-invoker view crew_compliance_summary (declared in CrewPendingViews); the browser does not call it directly",
+      "fleet_document_visible": "RLS helper of the fleet document library policies (the reader must be able to execute it); the client never calls it",
+      "fleet_document_ack_reader_for": "RLS helper of the fleet document acknowledgement, signer-rule and reminder policies (the reader must be able to execute it); the client never calls it",
+      "development_reviewer_for": "RLS helper of the development_applications SELECT policy (the reader must be able to execute it; caller-only); the client never calls it",
+      "development_application_company": "RLS helper of the fleet_training_participants policies (the reader must be able to execute it; answers only the caller's own company); the client never calls it"
     }
   },
   "knownMismatches": []

@@ -1,0 +1,75 @@
+[
+  {
+    "id": "fb000000-0000-4000-8000-000000000001",
+    "entity_type": "crew_profile",
+    "entity_id": "b0000000-0000-4000-8000-000000000015",
+    "action": "UPDATE",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_email": "fleet.manager@demo-fleet.example",
+    "actor_role": "dpa",
+    "changed_fields": [
+      "address_line1",
+      "city",
+      "repatriation_airport"
+    ],
+    "new_values": {
+      "via": "crew_personal_details"
+    },
+    "timestamp": "$ts:-1d"
+  },
+  {
+    "id": "fb000000-0000-4000-8000-000000000002",
+    "entity_type": "crew_profile",
+    "entity_id": "a0000000-0000-4000-8000-000000000015",
+    "action": "UPDATE",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000011",
+    "actor_email": "master.11@demo-fleet.example",
+    "actor_role": "master",
+    "changed_fields": {
+      "position": true,
+      "joining_date": true
+    },
+    "timestamp": "$ts:-3d"
+  },
+  {
+    "id": "fb000000-0000-4000-8000-000000000003",
+    "entity_type": "crew_profile",
+    "entity_id": "b0000000-0000-4000-8000-000000000015",
+    "action": "UPDATE",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000015",
+    "actor_email": "chief.stew.15@demo-fleet.example",
+    "actor_role": "crew",
+    "changed_fields": [
+      "languages"
+    ],
+    "new_values": {
+      "via": "crew_languages"
+    },
+    "timestamp": "$ts:-3d"
+  },
+  {
+    "id": "fb000000-0000-4000-8000-000000000004",
+    "entity_type": "crew_certificate",
+    "entity_id": "c3000000-0000-4000-8000-000000000005",
+    "action": "CREATE",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_email": "fleet.manager@demo-fleet.example",
+    "actor_role": "dpa",
+    "changed_fields": null,
+    "new_values": {
+      "certificate_name": "Medical First Aid"
+    },
+    "timestamp": "$ts:-9d"
+  },
+  {
+    "id": "fb000000-0000-4000-8000-000000000005",
+    "entity_type": "crew_assignment",
+    "entity_id": "a0000000-0000-4000-8000-000000000015",
+    "action": "CREATE",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_email": "fleet.manager@demo-fleet.example",
+    "actor_role": "dpa",
+    "changed_fields": null,
+    "timestamp": "$ts:-135d"
+  }
+]

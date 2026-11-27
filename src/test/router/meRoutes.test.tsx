@@ -379,7 +379,6 @@ describe('the inbox and planned personal leaves', () => {
 
   it.each([
     ['/me/signature', 'Signature'],
-    ['/me/documents', 'Documents'],
     ['/me/leave', 'Leave'],
     ['/me/billing', 'Billing'],
   ])('%s opens Coming Soon inside the scope', async (url, title) => {

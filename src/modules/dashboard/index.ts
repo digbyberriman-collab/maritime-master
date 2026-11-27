@@ -8,7 +8,6 @@ export { default as FleetMap } from './pages/FleetMap';
 // Components
 export { ComplianceSnapshot } from './components/ComplianceSnapshot';
 export { DashboardHeader } from './components/DashboardHeader';
-export { FleetFilter } from './components/FleetFilter';
 export { KPITiles } from './components/KPITiles';
 export { default as MaintenanceWidgets } from './components/MaintenanceWidgets';
 export { OperationsSnapshot } from './components/OperationsSnapshot';

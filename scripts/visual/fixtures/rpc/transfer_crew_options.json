@@ -1,0 +1,64 @@
+{
+  "person": {
+    "profile_id": "b0000000-0000-4000-8000-000000000014",
+    "user_id": "a0000000-0000-4000-8000-000000000014",
+    "first_name": "Demo",
+    "preferred_name": null,
+    "last_name": "Bosun"
+  },
+  "from": {
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "vessel_name": "DRAAK",
+    "assignment_id": "d0000000-0000-4000-8000-000000000014",
+    "position_text": "Bosun",
+    "position_id": "531730fb-95cb-133d-47dd-40c75b8d61ff",
+    "position_key": "bosun",
+    "join_date": "$date:-126",
+    "is_master_office": false
+  },
+  "destinations": [
+    {
+      "vessel_id": "e0000000-0000-4000-8000-000000000007",
+      "name": "HYDRA",
+      "code": "HYD",
+      "requires_approval": true,
+      "same_position_id": "f1100000-0000-4000-8000-0000000000a1",
+      "positions": [
+        {
+          "id": "f1100000-0000-4000-8000-0000000000a2",
+          "key": "chief_officer",
+          "name": "Chief Officer",
+          "department_key": "bridge",
+          "department_label": "Bridge",
+          "rank_tier": "senior_officer"
+        },
+        {
+          "id": "f1100000-0000-4000-8000-0000000000a1",
+          "key": "bosun",
+          "name": "Bosun",
+          "department_key": "deck",
+          "department_label": "Deck",
+          "rank_tier": "petty_officer"
+        },
+        {
+          "id": "f1100000-0000-4000-8000-0000000000a3",
+          "key": "lead_deckhand",
+          "name": "Lead Deckhand",
+          "department_key": "deck",
+          "department_label": "Deck",
+          "rank_tier": "rating"
+        },
+        {
+          "id": "f1100000-0000-4000-8000-0000000000a4",
+          "key": "deckhand",
+          "name": "Deckhand",
+          "department_key": "deck",
+          "department_label": "Deck",
+          "rank_tier": "rating"
+        }
+      ]
+    }
+  ],
+  "open_transfer": null,
+  "blocked": null
+}

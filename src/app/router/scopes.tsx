@@ -44,7 +44,7 @@ import { useVesselSettingsAccess, vesselSettingsHref } from '@/app/nav/vesselSet
 import { RouteErrorBoundary, RouteSuspense } from './RouteBoundary';
 import { ScopeContext, useScope, type ScopeValue } from './scopeContext';
 import { useScopeAccess } from './useScopeAccess';
-import { legacyEntryFor, resolveLegacyTarget, targetKind, withSearch, type LegacyTargetKind } from './legacyResolve';
+import { legacyEntryApplies, legacyEntryFor, resolveLegacyTarget, targetKind, withSearch, type LegacyTargetKind } from './legacyResolve';
 import {
   FullPageLoading,
   FullPageVesselListError,
@@ -555,6 +555,10 @@ export const LegacyRoute: React.FC<{ from: string; children: React.ReactNode }> 
     if (import.meta.env.DEV) console.warn(`LegacyRoute: no legacy redirect for ${from}`);
     return <>{children}</>;
   }
+  // An armed entry whose target page is not registered yet (pendingTarget,
+  // D-W1-07) renders the old page exactly as before: no access wait and no
+  // vessel-list error.
+  if (!legacyEntryApplies(entry)) return <>{children}</>;
   // Signed out: the old page's own guard sends the user to sign in.
   if (access.signedOut) return <>{children}</>;
 

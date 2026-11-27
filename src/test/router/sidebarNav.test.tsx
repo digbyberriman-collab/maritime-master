@@ -150,9 +150,10 @@ describe('vessel URLs', () => {
   });
 
   it('light up the leaf a detail page sits under', () => {
-    renderSidebar('/v/hyd/crew/planner/manning?module=vessel', admin);
+    // The Planner leaf is a rebuilt page (X1-09B): beta, behind its capability.
+    renderSidebar('/v/hyd/crew/planner/manning?module=vessel', fleetAdmin);
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    expect(within(nav).getByRole('link', { name: /^Planner, current page/ })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /^Planner, beta, current page/ })).toBeInTheDocument();
   });
 
   it('light up Home on the vessel home only, not on every page under it', () => {
@@ -185,16 +186,17 @@ describe('the Fleet tree', () => {
       'Overview', 'Compliance', 'People', 'Workspaces', 'Administration', 'Configuration',
     ]);
     const compliance = within(nav).getByRole('group', { name: 'Compliance' });
-    expect(within(compliance).getByRole('link', { name: /^Documents, current page/ })).toBeInTheDocument();
+    expect(within(compliance).getByRole('link', { name: /^Documents(, beta)?, current page/ })).toBeInTheDocument();
   });
 
   it('shows only built pages by default', () => {
     renderSidebar('/fleet/dashboard?module=fleet', fleetAdmin, 'fleet');
     const nav = screen.getByRole('navigation', { name: 'Fleet folders' });
-    for (const label of ['Dashboard', 'Tracker', 'Reports', 'Calendar', 'Planner', 'Documents', 'Training', 'Users & Access', 'Notifications', 'Vessels']) {
+    // Phase 3 wave 1 pages are beta behind their capability (fleetAdmin holds every one).
+    for (const label of ['Dashboard', 'Tracker', 'Reports', 'Calendar', 'Planner', 'Documents', 'Forms & Checklists', 'Training', 'Medical', 'Users & Access', 'Notifications', 'Vessels']) {
       expect(within(nav).getByRole('link', { name: new RegExp(`^${label.replace(/[&]/g, '\\&')}`) }), label).toBeInTheDocument();
     }
-    for (const label of ['Safety queue', 'Forms & Checklists', 'Visits', 'Support', 'Vessel Settings', 'Add-ons', 'Feedback']) {
+    for (const label of ['Safety queue', 'Visits', 'Support', 'Vessel Settings', 'Add-ons', 'Feedback']) {
       expect(within(nav).queryByRole('link', { name: new RegExp(`^${label}`) }), label).toBeNull();
     }
   });
@@ -209,9 +211,11 @@ describe('the Fleet tree', () => {
   });
 
   it('gates the administration leaves on their capability (fail closed)', () => {
-    renderSidebar('/fleet/dashboard?module=fleet', admin, 'fleet');
+    renderSidebar('/fleet/tracker?module=fleet', admin, 'fleet');
     const nav = screen.getByRole('navigation', { name: 'Fleet folders' });
-    expect(within(nav).getByRole('link', { name: /^Dashboard/ })).toBeInTheDocument();
+    // Tracker is an ungated platform page; the dashboard (beta, X5-02A) and Users & Access need their capability.
+    expect(within(nav).getByRole('link', { name: /^Tracker/ })).toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: /^Dashboard/ })).toBeNull();
     expect(within(nav).queryByRole('link', { name: /^Users & Access/ })).toBeNull();
     expect(within(nav).queryByRole('group', { name: 'Administration' })).toBeNull();
   });

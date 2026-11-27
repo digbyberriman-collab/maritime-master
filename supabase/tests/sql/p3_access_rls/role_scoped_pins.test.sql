@@ -75,8 +75,12 @@ SELECT tests.lives(format($q$INSERT INTO public.flight_requests (id, crew_id, co
                    'an own flight request in A (on their vessel)');
 SELECT tests.lives(format($q$INSERT INTO public.hours_of_rest_records (id, crew_id, vessel_id, record_date, rest_periods) VALUES (%L, auth.uid(), %L, current_date, '[]')$q$, tests.id('hr:a1'), tests.vessel_id('A.hyd')),
                    'an own rest record on HYDRA');
+-- 20261124060700's engine guard refuses every signed-in direct work / rest write (work_rest_engine_only).
+-- This file pins the 010500 RLS policies, so the own-row inserts below run with the engine flag on.
+DO $$ BEGIN PERFORM set_config('storm.crew_engine', 'on', true); END $$;
 SELECT tests.lives(format($q$INSERT INTO public.work_rest_records (id, crew_id, vessel_id, record_date) VALUES (%L, auth.uid(), %L, current_date)$q$, tests.id('wr:a1'), tests.vessel_id('A.hyd')),
                    'an own work / rest record on HYDRA');
+DO $$ BEGIN PERFORM set_config('storm.crew_engine', '', true); END $$;
 SELECT tests.lives(format($q$INSERT INTO public.work_rest_monthly_submissions (id, crew_id, vessel_id, period_year, period_month) VALUES (%L, auth.uid(), %L, 2026, 11)$q$, tests.id('ws:a1'), tests.vessel_id('A.hyd')),
                    'an own monthly submission on HYDRA');
 SELECT tests.lives(format($q$UPDATE public.leave_requests SET end_date = end_date + 1 WHERE id = %L$q$, tests.id('lr:a')), 'an own leave request update on HYDRA');
@@ -187,6 +191,9 @@ SELECT tests.as_user(tests.user_id('A.crew_hyd'));
 SELECT tests.lives(format($q$INSERT INTO public.work_rest_notes (submission_id, author_id, body) VALUES (%L, auth.uid(), 'own note on own submission')$q$, tests.id('ws:a-hyd')), 'an own note on an own submission');
 SELECT tests.lives(format($q$INSERT INTO public.work_rest_notes (record_id, block_id, author_id, body) VALUES (%L, %L, auth.uid(), 'own note on own record and block')$q$, tests.id('wr:a-hyd'), tests.id('wb:a-hyd')),
                    'an own note on an own record and block');
+-- 20261124060700's engine guard refuses every signed-in direct work / rest write (work_rest_engine_only).
+-- This file pins the 010500 RLS policies, so the own-row inserts below run with the engine flag on.
+DO $$ BEGIN PERFORM set_config('storm.crew_engine', 'on', true); END $$;
 SELECT tests.lives(format($q$INSERT INTO public.work_rest_blocks (record_id, crew_id, block_type, start_minute, end_minute) VALUES (%L, auth.uid(), 'rest', 240, 600)$q$, tests.id('wr:a-hyd')), 'an own block on an own record');
 SELECT tests.lives(format($q$INSERT INTO public.work_rest_non_conformities (crew_id, submission_id, rule_code, rule_description, window_start, window_end) VALUES (auth.uid(), %L, 'R1', 'own', now(), now())$q$, tests.id('ws:a-hyd')),
                    'an own NC on an own submission');
@@ -194,6 +201,7 @@ SELECT tests.lives(format($q$INSERT INTO public.work_rest_compliance_checks (cre
                    'an own compliance check on an own submission');
 SELECT tests.lives($q$INSERT INTO public.work_rest_non_conformities (crew_id, rule_code, rule_description, window_start, window_end) VALUES (auth.uid(), 'R2', 'no submission', now(), now())$q$,
                    'an own NC with no submission');
+DO $$ BEGIN PERFORM set_config('storm.crew_engine', '', true); END $$;
 SELECT tests.ok((SELECT count(*) FROM public.work_rest_notes WHERE submission_id = tests.id('ws:a-hyd') OR record_id = tests.id('wr:a-hyd')) = 2, 'and reads both own notes');
 SELECT tests.reset_role();
 -- A row of one crew member never attaches to another's parent.

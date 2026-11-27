@@ -168,23 +168,28 @@ function findBestMatch(pathname: string, search: string, activeModuleId?: string
   // in-scope 404). Nodes below it that sit on the root path (the vessel Home
   // leaf, Fleet's section headings at /fleet) match exactly only, as in the
   // sidebar (SidebarNavigation activeLeafPath); otherwise a page with no
-  // leaf of its own would land under Home or Overview.
-  const visit = (node: NavigationNode, ancestors: NavigationNode[], depth: number, moduleRoot: string) => {
+  // leaf of its own would land under Home or Overview. Likewise a leaf on its
+  // own group's path (the crew Dashboard at /v/:vesselCode/crew, X1-10B)
+  // matches exactly only, so a crew page with no leaf stays under Crew and
+  // not under Crew › Dashboard.
+  const visit = (node: NavigationNode, ancestors: NavigationNode[], depth: number, moduleRoot: string, parentKey: string | null) => {
     if (isForeignCrossLink(node)) return;
     const nodePath = pathnameOf(node.path);
     const nodeKey = nodePath.toLowerCase();
     const exact = key === nodeKey;
-    const descendant = nodePath !== '/' && (depth === 0 || nodeKey !== moduleRoot.toLowerCase()) && key.startsWith(`${nodeKey}/`);
+    const leafOnGroupPath = !node.children?.length && nodeKey === parentKey;
+    const descendant =
+      nodePath !== '/' && (depth === 0 || nodeKey !== moduleRoot.toLowerCase()) && !leafOnGroupPath && key.startsWith(`${nodeKey}/`);
     if (exact || descendant) {
       const queryBonus = exact && routeQueryMatches(node.path, search) ? 500 : 0;
       const leafBonus = node.children?.length ? 0 : 100;
       const score = (exact ? 10_000 : 1_000) + nodePath.length + depth * 10 + queryBonus + leafBonus;
       if (!best || score > best.score) best = { node, trail: [...ancestors, node], score };
     }
-    node.children?.forEach((child) => visit(child, [...ancestors, node], depth + 1, moduleRoot));
+    node.children?.forEach((child) => visit(child, [...ancestors, node], depth + 1, moduleRoot, nodeKey));
   };
 
-  modules.forEach((module) => visit(module, [], 0, pathnameOf(module.path)));
+  modules.forEach((module) => visit(module, [], 0, pathnameOf(module.path), null));
   return best;
 }
 

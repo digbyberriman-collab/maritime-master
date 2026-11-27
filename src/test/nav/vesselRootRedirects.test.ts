@@ -1,12 +1,12 @@
 /**
  * Vessel root and group redirects skip a path a module manifest routes
  * itself (platform-prep PP3; X1 PR-X1-A part 3), as the workspace section
- * redirects already do. A crew index page registered in a manifest then
- * serves `/v/:vesselCode/crew`, and the generated `crew -> list` redirect is
- * not declared beside it.
+ * redirects already do. The crew manifest's index page (the crew dashboard,
+ * X1-10B) serves `/v/:vesselCode/crew`, so the generated `crew -> list`
+ * redirect is not declared beside it.
  *
  * The site map reads the module registry when it loads, so this file swaps
- * in a registry that holds every real manifest plus one fixture route.
+ * in a registry that holds every real manifest plus one fixture redirect.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -15,18 +15,14 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 vi.mock('@/app/registry/modules', async () => {
   const actual = await vi.importActual<typeof import('@/app/registry/modules')>('@/app/registry/modules');
   const { buildRegistry } = await vi.importActual<typeof import('@/app/registry/registry')>('@/app/registry/registry');
-  const page = () => Promise.resolve({ default: () => null });
   return {
     MODULE_REGISTRY: buildRegistry([
       ...actual.MODULE_REGISTRY.manifests,
       {
-        id: 'crew-index-fixture',
-        label: 'Crew index (fixture)',
+        id: 'bridge-redirect-fixture',
+        label: 'Bridge redirect (fixture)',
         scopes: ['vessel'],
-        routes: [
-          { scope: 'vessel', path: 'crew', page, guard: { kind: 'scope' } },
-          { scope: 'vessel', path: 'departments/bridge', redirectTo: '../bridge-home' },
-        ],
+        routes: [{ scope: 'vessel', path: 'departments/bridge', redirectTo: '../bridge-home' }],
       },
     ]),
   };
