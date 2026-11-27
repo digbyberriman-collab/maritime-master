@@ -101,6 +101,7 @@ Phase 0 lanes can share one tree, because their file ownership is disjoint. Phas
 - **State machines.** Pure transition logic goes in `lib/` with exhaustive tests. Persistence goes through an RPC (`record_transition` or a domain wrapper). The client never writes `status` directly.
 - **Data.** React Query with a key factory per entity. Scope ids go in every key. Select only the columns you need. Avoid N+1 queries.
 - **Forms.** React Hook Form + zod (`lib/<entity>Schema.ts`), the shared form helpers, date-only strings in local time, and `useDraft` where `gap/08` asks for drafts.
+- **Dates.** Calendar-day arithmetic comes from `@/lib/records/dates` (`daysBetween`, `addCalendarDays`, `daysBetweenOrNull` and the rest); a stream that needs a missing primitive files a hotspot follow-up instead of copying.
 - **Migrations.** Use the skeleton in `gap/00` §4. Each table gets `company_id`, `vessel_id` when the data belongs to a vessel, a `CHECK` on status, RLS through `user_belongs_to_company` + `user_can_reach_vessel` + the domain `*_can_*` helper, `WITH CHECK` on writes, updated_at triggers and a `COMMENT`.
 - **Edge functions.** Use the `_shared` helpers, `assertCapability` and the RLS-scoped client. Use the service role only when it is genuinely needed.
 - **UI.** Build on the Abyss primitives (`StatusPill`, `KpiTile`, `DataTable`, `MatrixGrid`, page states). Dark-first; check Daylight too. Make touch targets at least 44 px on tablet layouts.
