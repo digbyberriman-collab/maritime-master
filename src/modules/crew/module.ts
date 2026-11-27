@@ -40,7 +40,9 @@
  *     is no longer planned, so its Coming Soon route is gone by itself).
  *   Moved leaves keep `live` and exactly today's gates (D-X1-25): the slice
  *   that swaps in a leaf's page sets its §4 capability and status beta.
- *   Planned leaves carry their capability now.
+ *   Planned leaves: Performance Appraisals and Visitors carry their future
+ *   gate now; Checklists carries none until X5 defines the crew-area
+ *   checklist key with its page (C64, D-271; X1 spec §4 lists "—").
  * - capabilities: the PMS keys the crew pages and actions use (X1 spec §5,
  *   less the crew medical key X5 owns; platform-prep plan §1).
  * - notificationTypes: the crew notification types and their emitters
@@ -117,7 +119,8 @@ const manifest: ModuleManifest = {
       order: 80,
       node: L('Familiarisation', CREW_ROOT, { icon: FileCheck, status: 'beta', capability: CREW_CAPS.famView }),
     },
-    // Planned (Coming Soon until their slice): each carries the capability its page will need.
+    // Planned (Coming Soon until their slice). Appraisals and Visitors carry their future gate; Checklists
+    // carries none until X5 defines the crew-area checklist key with its page (C64, D-271; X1 spec §4 "—").
     { slot: 'vessel.crew', order: 90, node: L('Checklists', CREW_ROOT, { icon: CheckSquare }) },
     {
       slot: 'vessel.crew',

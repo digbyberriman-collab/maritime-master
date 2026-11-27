@@ -1,5 +1,4 @@
-import React, { useMemo, useState } from "react";
-import { toast } from "sonner";
+import React, { useId, useMemo, useState } from "react";
 import DashboardLayout from "@/shared/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +33,7 @@ import { TrendInsightsPanel } from "@/modules/analytics/components/TrendInsights
 import { cn } from "@/lib/utils";
 
 const IncidentAnalytics: React.FC = () => {
+  const exportReasonId = useId();
   const [datePreset, setDatePreset] = useState<DateRangePreset>("last30");
   const [selectedVessel, setSelectedVessel] = useState<string>("all");
   const { vessels } = useVessels();
@@ -105,10 +105,14 @@ const IncidentAnalytics: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" className="gap-2" onClick={() => toast.info('Export analytics feature coming soon')}>
-              <Download className="w-4 h-4" />
+            {/* No export yet (R19, D-384; X2 adds it with R6): a disabled control with its reason, never a fake one. */}
+            <Button variant="outline" className="gap-2" disabled aria-describedby={exportReasonId}>
+              <Download className="w-4 h-4" aria-hidden="true" />
               Export
             </Button>
+            <span id={exportReasonId} className="type-caption text-muted-foreground">
+              Export is not available for this report yet
+            </span>
           </div>
         </div>
 

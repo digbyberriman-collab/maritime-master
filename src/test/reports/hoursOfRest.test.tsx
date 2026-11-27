@@ -14,7 +14,9 @@
  *   map with its legend text and cell labels; Show from the URL changes
  *   the table and what the heat map counts; Apply writes the filters to
  *   the URL; repeat breaches; not set up (D-01); the period refusal in
- *   words; totals NULL = "Not covered", never zeros; cards below 768 px.
+ *   words; totals NULL = "Not covered", never zeros; a failed read is an
+ *   error on every tile (Retry only where retrying can help), never a
+ *   skeleton left busy; cards below 768 px.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -181,6 +183,8 @@ function renderReport(url = '/fleet/reports/hours-of-rest') {
 }
 
 const callsOf = (fn: string) => state.rpc.mock.calls.filter((c) => c[0] === fn).map((c) => c[1] as Record<string, unknown>);
+/** The KPI tiles of the summary (each carries its state in `data-state`). */
+const summaryTiles = () => Array.from(screen.getByRole('region', { name: 'Hours of rest summary' }).querySelectorAll<HTMLElement>('[data-state]'));
 const vesselTable = () => screen.getByRole('table', { name: 'Hours of rest by vessel' });
 const vesselRows = () => within(vesselTable()).getAllByRole('row').slice(1);
 
@@ -385,6 +389,39 @@ describe('Hours of rest page', () => {
     renderReport();
     expect(await screen.findByText(PERIOD_TOO_LONG_MESSAGE)).toBeInTheDocument();
     expect(callsOf('fleet_report_hours_of_rest')).toHaveLength(1);
+    // The tiles are errors, not skeletons, and offer no Retry that would be refused again.
+    const tiles = summaryTiles();
+    expect(tiles).toHaveLength(5);
+    for (const tile of tiles) {
+      expect(tile).toHaveAttribute('data-state', 'error');
+      expect(tile).not.toHaveAttribute('aria-busy');
+      expect(within(tile).queryByRole('button', { name: /Try again/ })).toBeNull();
+    }
+  });
+
+  it('a failed read turns every tile into an error with Retry, never a skeleton left busy', async () => {
+    state.shown = shownReady();
+    let calls = 0;
+    state.answers = {
+      fleet_report_hours_of_rest: () => {
+        calls += 1;
+        // The hook retries a transient failure once; the third read succeeds.
+        return calls <= 2 ? { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } } : { data: answer(), error: null };
+      },
+    };
+    renderReport();
+    const summary = await screen.findByRole('region', { name: 'Hours of rest summary' });
+    await waitFor(() => expect(summaryTiles().every((t) => t.getAttribute('data-state') === 'error')).toBe(true), { timeout: 4000 });
+    const tiles = summaryTiles();
+    expect(tiles).toHaveLength(5);
+    for (const tile of tiles) {
+      expect(tile).not.toHaveAttribute('aria-busy');
+      expect(tile).toHaveTextContent('Could not load');
+    }
+    expect(summary.querySelector('[aria-busy="true"]')).toBeNull();
+    fireEvent.click(within(tiles[0]).getByRole('button', { name: /Try again/ }));
+    await within(summary).findByText('45.5');
+    expect(summaryTiles().some((t) => t.getAttribute('data-state') === 'error')).toBe(false);
   });
 
   it('folds the vessel table into cards below 768 px', async () => {

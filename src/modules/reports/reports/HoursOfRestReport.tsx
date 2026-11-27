@@ -31,7 +31,7 @@ import type { Json } from '@/integrations/supabase/types';
 import { TONE_SURFACE } from '@/components/ui/tones';
 import { cn } from '@/lib/utils';
 import type { DataTableColumn } from '@/shared/components/data/DataTable';
-import { KpiGrid, KpiTile } from '@/shared/components/data/KpiTile';
+import { KpiGrid, KpiTile, type KpiTileState } from '@/shared/components/data/KpiTile';
 import { MatrixGrid, type MatrixColumn } from '@/shared/components/data/MatrixGrid';
 import { TABLET_MIN_WIDTH, useMinWidth } from '@/shared/components/data/useMinWidth';
 import { EmptyState } from '@/shared/components/states';
@@ -41,6 +41,7 @@ import { ReportShell, ReportTable } from '../components/ReportShell';
 import { CoverageNote, CrewReportGate, NotCoveredDash, ShownVesselsToolbar } from '../components/CrewReportParts';
 import { reportsKeys } from '../hooks/keys';
 import { useHoursOfRestReport } from '../hooks/useCrewReports';
+import { ReportDataError } from '../hooks/useReportData';
 import { useReportFilters } from '../hooks/useReportFilters';
 import { useShownReportScope } from '../hooks/useShownReportScope';
 import {
@@ -70,6 +71,8 @@ import type { FleetReportHoursOfRestJson, HoursOfRestVesselRow, ReportVesselCove
 const COARSE = '[@media(pointer:coarse)]:min-h-11';
 const LINK = cn('-mx-1 inline-flex min-h-8 items-center rounded-sm px-1 hover:underline focus-ring', COARSE);
 const n = (v: number) => v.toLocaleString('en-GB');
+/** Refusals a retry cannot fix (the period the server will not read): the tiles offer no Retry for them. */
+const NOT_RETRYABLE: ReadonlySet<string> = new Set(['period_too_long', 'invalid_period']);
 
 function VesselLink({ vessel }: { vessel: Pick<ReportVesselCoverage, 'vessel_code' | 'vessel_name'> }) {
   return vessel.vessel_code ? (
@@ -360,7 +363,13 @@ export default function HoursOfRestReport({ definition }: ReportComponentProps) 
   const exportParams: Json = { period, show, from: range.from, to: range.to, vessels: ready && !ready.isDefault ? ready.shownVessels.map((v) => v.code) : 'counted' };
 
   const notCoveredAnywhere = data !== null && totals === null;
-  const tileState = (value: number | undefined) => (loading ? 'loading' : notCoveredAnywhere ? 'not-enabled' : value === undefined ? 'loading' : undefined);
+  // A failed read is an error on every tile (never a skeleton that stays busy); Retry only where retrying can help:
+  // a period the server refuses fails the same way again.
+  const failed = read.state === 'error';
+  const refused = failed && read.error instanceof ReportDataError && NOT_RETRYABLE.has(read.error.reason);
+  const retry = failed && !refused ? read.retry : undefined;
+  const tileState = (value: number | undefined): KpiTileState | undefined =>
+    loading ? 'loading' : failed ? 'error' : notCoveredAnywhere ? 'not-enabled' : value === undefined ? 'loading' : undefined;
   const NOT_COVERED = 'Not covered on any vessel shown';
 
   let body: React.ReactNode;
@@ -388,6 +397,7 @@ export default function HoursOfRestReport({ definition }: ReportComponentProps) 
               value={totals?.unreviewed}
               tone={totals && totals.unreviewed > 0 ? 'danger' : undefined}
               state={tileState(totals?.unreviewed)}
+              onRetry={retry}
               notEnabledReason={NOT_COVERED}
               zeroLabel="All reviewed"
             />
@@ -397,6 +407,7 @@ export default function HoursOfRestReport({ definition }: ReportComponentProps) 
               value={totals?.serious_days}
               tone={totals && totals.serious_days > 0 ? 'danger' : undefined}
               state={tileState(totals?.serious_days)}
+              onRetry={retry}
               notEnabledReason={NOT_COVERED}
               zeroLabel="None serious"
               sub={totals ? `${n(totals.breach_days)} breach days in all` : undefined}
@@ -407,6 +418,7 @@ export default function HoursOfRestReport({ definition }: ReportComponentProps) 
               value={totals?.months_not_submitted}
               tone={totals && totals.months_not_submitted > 0 ? 'warn' : undefined}
               state={tileState(totals?.months_not_submitted)}
+              onRetry={retry}
               notEnabledReason={NOT_COVERED}
               zeroLabel="All submitted"
             />
@@ -415,6 +427,7 @@ export default function HoursOfRestReport({ definition }: ReportComponentProps) 
               icon={Ship}
               value={totals?.vessels_logging}
               state={tileState(totals?.vessels_logging)}
+              onRetry={retry}
               notEnabledReason={NOT_COVERED}
               zeroLabel="None logging"
               sub={totals ? `of ${n(totals.vessels_covered)} covered` : undefined}
@@ -423,7 +436,8 @@ export default function HoursOfRestReport({ definition }: ReportComponentProps) 
               label="Breach rate"
               icon={AlertOctagon}
               value={totals ? rateText(totals.rate_per_100) : undefined}
-              state={loading ? 'loading' : notCoveredAnywhere ? 'not-enabled' : totals && totals.rate_per_100 === null ? 'zero' : undefined}
+              state={loading ? 'loading' : failed ? 'error' : notCoveredAnywhere ? 'not-enabled' : totals && totals.rate_per_100 === null ? 'zero' : undefined}
+              onRetry={retry}
               notEnabledReason={NOT_COVERED}
               zeroLabel="Nothing logged"
               sub={totals ? `per 100 crew-days · ${n(totals.crew_days)} logged` : undefined}

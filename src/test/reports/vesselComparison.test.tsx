@@ -6,11 +6,13 @@
  *   (severe, watch; a NULL group, or a safety group with no counted part, is
  *   not covered); worst first, not covered last, then by name; the Show
  *   filter; the KPI summary (null totals when no vessel counts a metric);
- *   the export columns;
+ *   the export columns; Documents split by source when the server sends
+ *   the split (C-1, D-381), each count linking to the report that holds it,
+ *   else one combined metric per bucket that says so;
  * - the page: one read of `fleet_vessel_comparison` for the vessels shown
  *   (NULL for the default), rows worst first with a status pill, "–" for
- *   not covered (never 0), numbers linked to the vessel's own page (CAPA
- *   tracker for corrective actions, plain for insurance), the tab in the
+ *   not covered (never 0), numbers linked to the report or page that holds
+ *   them with its filter (plain for insurance), the tab in the
  *   URL, the Show filter applied from the URL, "This report is not set up
  *   yet" while the RPC is missing, an error with Retry, cards below 768 px,
  *   and Export enabled once the data is ready.
@@ -63,7 +65,11 @@ import VesselComparisonReport from '@/modules/reports/reports/VesselComparisonRe
 import { getReport, type ReportDefinition } from '@/modules/reports/registry';
 import {
   COMPARISON_METRICS,
+  DOCUMENTS_BY_SOURCE_METRICS,
+  DOCUMENTS_COMBINED_METRICS,
   comparisonExportColumns,
+  comparisonMetrics,
+  documentsBySource,
   comparisonRows,
   comparisonSummary,
   findingsStatus,
@@ -142,11 +148,15 @@ describe('vessel comparison (pure)', () => {
     expect(none.covered).toBe(0);
   });
 
-  it('links numbers to the vessel’s own pages; corrective actions to the CAPA tracker; insurance plain', () => {
+  it('links numbers to the report or page that holds them, with the filter; insurance plain', () => {
     const href = (tab: keyof typeof COMPARISON_METRICS, id: string) => COMPARISON_METRICS[tab].find((m) => m.id === id)?.href('DRA');
-    expect(href('documents', 'expired')).toBe('/v/dra/certificates');
+    // Without the split: the combined buckets open the certificates report on that vessel.
+    expect(href('documents', 'expired')).toBe('/fleet/reports/fleet-certificates?vessels=DRA&status=expired');
+    expect(href('documents', 'expiring')).toBe('/fleet/reports/fleet-certificates?vessels=DRA&status=due');
+    expect(href('documents', 'endorsements_overdue')).toBe('/v/dra/certificates');
     expect(href('safety', 'overdue_drills')).toBe('/v/dra/safety/drills');
-    expect(href('safety', 'open_corrective_actions')).toBe('/fleet/reports/capa-tracker');
+    expect(href('safety', 'open_corrective_actions')).toBe('/fleet/reports/capa-tracker?vessels=DRA&status=open');
+    expect(href('safety', 'overdue_corrective_actions')).toBe('/fleet/reports/capa-tracker?vessels=DRA&status=overdue');
     expect(href('technical', 'overdue_jobs')).toBe('/v/dra/technical?tab=schedule');
     expect(href('insurance', 'expired')).toBeNull();
     expect(href('hours-of-rest', 'breach_days')).toBe('/v/dra/crew/hours-of-rest');
@@ -154,9 +164,86 @@ describe('vessel comparison (pure)', () => {
 
   it('exports vessel, code, status and the tab’s numbers, blank where not covered', () => {
     const table = buildExportTable(comparisonExportColumns('documents'), sortByFindings(ROWS, 'documents'));
-    expect(table.headers).toEqual(['Vessel', 'Code', 'Status', 'Expired documents', 'Endorsements overdue', 'Expiring within their window']);
+    expect(table.headers).toEqual(['Vessel', 'Code', 'Status', 'Expired certificates and crew items', 'Endorsements overdue', 'Certificates and crew items expiring within their window']);
     expect(table.rows[0]).toEqual(['BRAVO', 'BRA', 'Needs action', 2, 0, 0]);
     expect(table.rows[4]).toEqual(['GAME CHANGER', 'GAM', 'Not covered', null, null, null]);
+  });
+});
+
+describe('vessel comparison documents by source (C-1, D-381)', () => {
+  type Split = { expired_vessel_certificates: number; expired_crew_items: number; expiring_vessel_certificates: number; expiring_crew_items: number };
+  const docs = (expired: [number, number], endorsements: number, expiring: [number, number]): FleetVesselComparison['documents'] & Split => ({
+    value: expired[0] + expired[1] + endorsements + expiring[0] + expiring[1],
+    expired: expired[0] + expired[1],
+    endorsements_overdue: endorsements,
+    expiring: expiring[0] + expiring[1],
+    expired_vessel_certificates: expired[0],
+    expired_crew_items: expired[1],
+    expiring_vessel_certificates: expiring[0],
+    expiring_crew_items: expiring[1],
+  });
+  const SPLIT: FleetVesselComparison[] = [
+    row('DRAAK', 'DRA', { documents: docs([1, 2], 1, [0, 3]) }),
+    row('HYDRA', 'HYD', { documents: docs([0, 0], 0, [1, 0]) }),
+    row('GAME CHANGER', 'GAM', { documents: null }),
+  ];
+  const metric = (id: string) => DOCUMENTS_BY_SOURCE_METRICS.find((m) => m.id === id);
+
+  it('reads the split only when the four counts are there and add up', () => {
+    expect(documentsBySource(SPLIT[0])).toEqual({ expiredCertificates: 1, expiredCrewItems: 2, expiringCertificates: 0, expiringCrewItems: 3 });
+    expect(documentsBySource(ROWS[1])).toBeNull();
+    expect(documentsBySource(SPLIT[2])).toBeNull();
+    const wrong = row('X', 'X', { documents: { ...docs([1, 1], 0, [0, 0]), expired: 5 } });
+    expect(documentsBySource(wrong)).toBeNull();
+  });
+
+  it('shows the by-source metrics when every vessel with documents carries the split, else the combined ones', () => {
+    expect(comparisonMetrics('documents', SPLIT)).toBe(DOCUMENTS_BY_SOURCE_METRICS);
+    expect(comparisonMetrics('documents', ROWS)).toBe(DOCUMENTS_COMBINED_METRICS);
+    expect(comparisonMetrics('documents', [SPLIT[0], ROWS[1]])).toBe(DOCUMENTS_COMBINED_METRICS);
+    expect(comparisonMetrics('documents', [SPLIT[2]])).toBe(DOCUMENTS_COMBINED_METRICS);
+    expect(comparisonMetrics('safety', SPLIT)).toBe(COMPARISON_METRICS.safety);
+    expect(DOCUMENTS_BY_SOURCE_METRICS.map((m) => m.label)).toEqual([
+      'Expired certificates',
+      'Expired crew documents',
+      'Endorsements overdue',
+      'Expiring certificates',
+      'Expiring crew documents',
+    ]);
+    expect(DOCUMENTS_COMBINED_METRICS.map((m) => m.title)).toEqual([
+      'Expired certificates and crew items',
+      'Endorsements overdue',
+      'Certificates and crew items expiring within their window',
+    ]);
+  });
+
+  it('links each source to the report that holds it, on that vessel and bucket', () => {
+    expect(metric('expired_vessel_certificates')?.href('DRA')).toBe('/fleet/reports/fleet-certificates?vessels=DRA&status=expired');
+    expect(metric('expired_crew_items')?.href('DRA')).toBe('/fleet/reports/crew-documents?vessels=DRA&vessel=DRA&status=expired');
+    expect(metric('endorsements_overdue')?.href('DRA')).toBe('/v/dra/certificates');
+    expect(metric('expiring_vessel_certificates')?.href('DRA')).toBe('/fleet/reports/fleet-certificates?vessels=DRA&status=due');
+    expect(metric('expiring_crew_items')?.href('DRA')).toBe('/fleet/reports/crew-documents?vessels=DRA&vessel=DRA&status=due');
+  });
+
+  it('counts the same findings with or without the split, and exports by source', () => {
+    expect(vesselFindings(SPLIT[0], 'documents')).toEqual({ covered: true, severe: 4, watch: 3 });
+    expect(DOCUMENTS_BY_SOURCE_METRICS.map((m) => m.value(SPLIT[0]))).toEqual([1, 2, 1, 0, 3]);
+    expect(comparisonSummary(SPLIT, 'documents').totals).toEqual({ expired: 3, endorsements_overdue: 1, expiring: 4 });
+    const table = buildExportTable(comparisonExportColumns('documents', SPLIT), sortByFindings(SPLIT, 'documents'));
+    expect(table.headers).toEqual([
+      'Vessel',
+      'Code',
+      'Status',
+      'Expired vessel certificates',
+      'Expired crew documents and qualifications',
+      'Endorsements overdue',
+      'Vessel certificates expiring within their window',
+      'Crew documents and qualifications expiring within their window',
+    ]);
+    expect(table.rows[0]).toEqual(['DRAAK', 'DRA', 'Needs action', 1, 2, 1, 0, 3]);
+    expect(table.rows[2]).toEqual(['GAME CHANGER', 'GAM', 'Not covered', null, null, null, null, null]);
+    // Without the answer's rows the export keeps the combined columns the table shows.
+    expect(buildExportTable(comparisonExportColumns('documents'), SPLIT).headers).toHaveLength(6);
   });
 });
 
@@ -238,10 +325,41 @@ describe('Vessel comparison page', () => {
     const draak = bodyRows()[1];
     expect(within(draak).getByText('Needs action')).toBeInTheDocument();
     expect(within(draak).getByRole('link', { name: 'DRAAK' })).toHaveAttribute('href', '/v/dra');
-    expect(within(draak).getByRole('link', { name: 'Expired documents on DRAAK: 1' })).toHaveAttribute('href', '/v/dra/certificates');
+    expect(within(draak).getByRole('link', { name: 'Expired certificates and crew items on DRAAK: 1' })).toHaveAttribute(
+      'href',
+      '/fleet/reports/fleet-certificates?vessels=DRA&status=expired',
+    );
     // A zero is a number, not a link.
     expect(within(draak).queryByRole('link', { name: /Endorsements overdue on DRAAK/ })).toBeNull();
     expect(screen.getByTestId('report-generated')).toHaveTextContent(/^Fleet · generated /);
+  });
+
+  it('shows Documents by source when the answer carries the C-1 split (the answer schema keeps it, D-381)', async () => {
+    state.shown = shownReady();
+    const split = ROWS.map((r) =>
+      r.documents
+        ? {
+            ...r,
+            documents: {
+              ...r.documents,
+              expired_vessel_certificates: r.documents.expired,
+              expired_crew_items: 0,
+              expiring_vessel_certificates: 0,
+              expiring_crew_items: r.documents.expiring,
+            },
+          }
+        : r,
+    );
+    state.answers = { fleet_vessel_comparison: { data: split, error: null } };
+    renderReport();
+    await screen.findByRole('table');
+    await waitFor(() => expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toContain('Expiring crew documents'));
+    const draak = bodyRows().find((r) => within(r).queryByRole('link', { name: 'DRAAK' }));
+    expect(draak).toBeDefined();
+    expect(within(draak as HTMLElement).getByRole('link', { name: 'Expired vessel certificates on DRAAK: 1' })).toHaveAttribute(
+      'href',
+      '/fleet/reports/fleet-certificates?vessels=DRA&status=expired',
+    );
   });
 
   it('sends a chosen set of vessels as their ids', async () => {
@@ -263,7 +381,10 @@ describe('Vessel comparison page', () => {
     expect(screen.getByRole('tab', { name: 'Safety' })).toHaveAttribute('aria-selected', 'true');
     await waitFor(() => expect(firstCells()[0]).toBe('DRAAK'));
     const draak = bodyRows()[0];
-    expect(within(draak).getByRole('link', { name: 'Overdue corrective actions on DRAAK: 1' })).toHaveAttribute('href', '/fleet/reports/capa-tracker');
+    expect(within(draak).getByRole('link', { name: 'Overdue corrective actions on DRAAK: 1' })).toHaveAttribute(
+      'href',
+      '/fleet/reports/capa-tracker?vessels=DRA&status=overdue',
+    );
     expect(within(draak).getByRole('link', { name: 'Overdue drills on DRAAK: 1' })).toHaveAttribute('href', '/v/dra/safety/drills');
     // The tab's lead KPI and its column share the short label.
     const summary = screen.getByRole('region', { name: 'Comparison summary' });

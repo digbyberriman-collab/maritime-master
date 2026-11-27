@@ -430,7 +430,7 @@
     {"expected":{"error":"Not a calendar date: garbage","ok":false},"input":{"companyId":"dd93094b-a263-80ee-fdf6-71bf15f30cc0","date":"garbage","type":"PTW","vesselId":"82664aec-5ddb-0cc7-bc9a-52f91b7b1e4f","voyage":true},"sql":null,"sqlSkip":"\"garbage\" is not a calendar date: a date argument cannot carry it"}
   ],
   "sourceSha256": {
-    "src/lib/records/dates.ts": "726e2517275916c1cc1a93b063b1e6d2fd7060f437907762367185299d7f21a3",
+    "src/lib/records/dates.ts": "5bcdf1b5f421a41543354b1099c8ffc23cc74c64498d726c1781820a832880be",
     "src/lib/records/reference.ts": "b670b52df2bfd6c4e655a2962975fa3c90cf37edbb23bceb6818bbf3ae119016"
   },
   "version": 1,

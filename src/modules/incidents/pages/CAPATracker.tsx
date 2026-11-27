@@ -1,4 +1,21 @@
-import React, { useState } from "react";
+/**
+ * Fleet › Reports › CAPA tracker (`/fleet/reports/capa-tracker`, a legacy
+ * hub page; gap/02 R6 is X2's). The fleet dashboard and the vessel
+ * comparison link here with their filters (D-381), which seed the page's
+ * filters once on arrival:
+ *
+ * - `?vessels=` naming exactly one known vessel code: that vessel (the
+ *   tracker filters one vessel at a time; more than one code keeps every
+ *   vessel and says so);
+ * - `?status=open`: every action not closed ("All open"); `?status=overdue`:
+ *   the actions past their due date ("Overdue"); both are applied to the
+ *   list here, since the list's status filter is one stored status.
+ *
+ * Export: none yet (R19, D-384; X2 adds it with R6): the Export control is
+ * disabled with its reason beside it, never a control that does nothing.
+ */
+import React, { useId, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import DashboardLayout from "@/shared/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,26 +42,66 @@ import {
   useAssigneePerformance 
 } from "@/modules/analytics/hooks/useCAPAAnalytics";
 import { useVessels } from "@/modules/vessels/hooks/useVessels";
+import { resolveVesselByCode } from "@/modules/vessels/lib/vesselCode";
 import { useCrew } from "@/modules/crew/hooks/useCrew";
 import { CAPAAgingChart } from "@/modules/analytics/components/CAPAAgingChart";
 import { getCAPAStatusColor } from "@/modules/incidents/constants";
 import { cn } from "@/lib/utils";
 
+/** Status choices beyond one stored status, applied on the page (the list hook filters one status). */
+const ALL_OPEN = "all_open";
+const OVERDUE = "overdue";
+
+/** The Status filter a `?status=` value seeds: `open` = every action not closed, `overdue` = past due. */
+function statusFromQuery(value: string | null): string {
+  const v = (value ?? "").trim().toLowerCase();
+  if (v === "open") return ALL_OPEN;
+  if (v === OVERDUE) return OVERDUE;
+  return "all";
+}
+
+/** The distinct vessel codes of a `?vessels=` value (upper case). */
+function codesFromQuery(value: string | null): string[] {
+  const codes = (value ?? "")
+    .split(/[\s,]+/)
+    .map((c) => c.trim().toUpperCase())
+    .filter(Boolean);
+  return [...new Set(codes)];
+}
+
 const CAPATracker: React.FC = () => {
-  const [vesselFilter, setVesselFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const exportReasonId = useId();
+  const [params] = useSearchParams();
+  const queryCodes = useMemo(() => codesFromQuery(params.get("vessels")), [params]);
+  // null: the reader has not picked a vessel; the query string's vessel (once known) applies.
+  const [vesselChoice, setVesselChoice] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState(() => statusFromQuery(params.get("status")));
   const [typeFilter, setTypeFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
 
   const { vessels } = useVessels();
   const { crew } = useCrew();
+  const queryVesselId = useMemo(() => {
+    if (queryCodes.length !== 1 || !vessels?.length) return null;
+    return resolveVesselByCode(queryCodes[0], vessels)?.id ?? null;
+  }, [queryCodes, vessels]);
+  const vesselFilter = vesselChoice ?? queryVesselId ?? "all";
+  const showsEveryVesselOfMany = vesselChoice === null && queryCodes.length > 1;
+
+  const pageStatus = statusFilter === ALL_OPEN || statusFilter === OVERDUE;
   const { data: metrics, isLoading: isMetricsLoading } = useCAPAMetrics();
-  const { data: capas, isLoading: isCapasLoading } = useCAPAList({
+  const { data: listed, isLoading: isCapasLoading } = useCAPAList({
     vesselId: vesselFilter,
-    status: statusFilter,
+    status: pageStatus ? "all" : statusFilter,
     type: typeFilter,
     assignedTo: assigneeFilter,
   });
+  const capas = useMemo(() => {
+    if (!listed) return listed;
+    if (statusFilter === ALL_OPEN) return listed.filter((c) => c.status !== "Closed");
+    if (statusFilter === OVERDUE) return listed.filter((c) => c.is_overdue);
+    return listed;
+  }, [listed, statusFilter]);
   const { data: aging } = useCAPAAging();
   const { data: assigneePerformance } = useAssigneePerformance();
 
@@ -74,10 +131,16 @@ const CAPATracker: React.FC = () => {
               Corrective and Preventive Action management
             </p>
           </div>
-          <Button variant="outline" className="gap-2" onClick={() => toast.info('Export report feature coming soon')}>
-            <Download className="w-4 h-4" />
-            Export Report
-          </Button>
+          {/* No export yet (R19, D-384; X2 adds it with R6): a disabled control with its reason, never a fake one. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="gap-2" disabled aria-describedby={exportReasonId}>
+              <Download className="w-4 h-4" aria-hidden="true" />
+              Export Report
+            </Button>
+            <span id={exportReasonId} className="type-caption text-muted-foreground">
+              Export is not available for this report yet
+            </span>
+          </div>
         </div>
 
         {/* Metrics Cards */}
@@ -164,7 +227,7 @@ const CAPATracker: React.FC = () => {
         <Card className="shadow-card">
           <CardContent className="pt-6">
             <div className="flex flex-wrap gap-4">
-              <Select value={vesselFilter} onValueChange={setVesselFilter}>
+              <Select value={vesselFilter} onValueChange={setVesselChoice}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Vessel" />
                 </SelectTrigger>
@@ -182,6 +245,8 @@ const CAPATracker: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value={ALL_OPEN}>All open</SelectItem>
+                  <SelectItem value={OVERDUE}>Overdue</SelectItem>
                   <SelectItem value="Open">Open</SelectItem>
                   <SelectItem value="In Progress">In Progress</SelectItem>
                   <SelectItem value="Verification">Verification</SelectItem>
@@ -207,7 +272,8 @@ const CAPATracker: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Assignees</SelectItem>
-                  {crew?.map((c) => (
+                  {/* Only people with a login can be assigned an action (assigned_to is their user id). */}
+                  {crew?.filter((c) => c.user_id).map((c) => (
                     <SelectItem key={c.user_id} value={c.user_id}>
                       {c.first_name} {c.last_name}
                     </SelectItem>
@@ -215,6 +281,11 @@ const CAPATracker: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
+            {showsEveryVesselOfMany ? (
+              <p className="mt-3 type-caption text-muted-foreground" data-testid="capa-vessels-note">
+                Showing every vessel: this tracker filters one vessel at a time
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 

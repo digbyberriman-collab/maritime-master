@@ -5,6 +5,10 @@
  * day). Day differences are computed on the calendar numbers through UTC, so
  * daylight-saving changes and the machine's time zone never move a day.
  *
+ * This is the one home of calendar-day arithmetic (MASTER-PROMPT §4): a
+ * stream that needs a missing primitive asks for it here (a hotspot
+ * follow-up) instead of copying one into its module.
+ *
  * Two ways to turn input into a calendar day:
  *
  * - `toCalendarDate` is for date columns (`expires_on`, a record's numbering
@@ -64,6 +68,39 @@ export function dayNumber(input: DateInput): number {
 /** Whole calendar days from `from` to `to` (negative when `to` is earlier). */
 export function daysBetween(from: DateInput, to: DateInput): number {
   return dayNumber(to) - dayNumber(from);
+}
+
+/**
+ * `daysBetween` for display code: null when either side is missing or not
+ * a calendar date (instead of throwing), so "no date" has one meaning.
+ */
+export function daysBetweenOrNull(from?: string | null, to?: string | null): number | null {
+  if (from == null || to == null) return null;
+  try {
+    return daysBetween(from, to);
+  } catch (error) {
+    if (error instanceof RangeError) return null;
+    throw error;
+  }
+}
+
+/**
+ * The calendar day `n` whole days after `input` (before it for a negative
+ * `n`), as `yyyy-MM-dd`. Same input contract as `daysBetween` and
+ * `dayNumber` (through `toCalendarDate`): RangeError on garbage or an
+ * impossible date; a non-integer `n` is a RangeError too. The arithmetic is
+ * on UTC calendar numbers, so daylight-saving changes and the machine's
+ * time zone never move the day.
+ */
+export function addCalendarDays(input: DateInput, n: number): string {
+  if (!Number.isInteger(n)) throw new RangeError(`Days must be a whole number: ${String(n)}`);
+  const [y, m, d] = toCalendarDate(input).split('-').map(Number);
+  const utc = new Date(0);
+  utc.setUTCFullYear(y, m - 1, d + n);
+  if (Number.isNaN(utc.getTime())) throw new RangeError(`Date out of range: ${String(input)} + ${n}`);
+  const yy = utc.getUTCFullYear();
+  if (yy < 1 || yy > 9999) throw new RangeError(`Date out of range: ${String(input)} + ${n}`);
+  return `${String(yy).padStart(4, '0')}-${String(utc.getUTCMonth() + 1).padStart(2, '0')}-${String(utc.getUTCDate()).padStart(2, '0')}`;
 }
 
 /** Milliseconds for an ISO timestamp; throws on garbage so ordering bugs surface. */

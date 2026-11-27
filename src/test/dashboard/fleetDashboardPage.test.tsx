@@ -7,7 +7,8 @@
  * - The KPI row: skeletons while the RPC runs, real zeros, the server's
  *   numbers with the W9 red rule, "Not set up yet" while the RPC is missing
  *   (D-01), "Could not load" with a working Retry, hidden tiles without
- *   access, links only for report keys the registry knows.
+ *   access, each part linked to the report that holds it (links only for
+ *   report keys the registry knows), "View all" to the list's report.
  * - The vessels shown: the default is sent as NULL (fleet-wide), a chosen
  *   set as its ids; a vessel out of reach says so and offers all vessels.
  * - The header (company eyebrow, "Fleet dashboard", n vessels, one
@@ -309,14 +310,54 @@ describe('the KPI row', () => {
     expect(tile('Leave overdue')).toBeInTheDocument();
   });
 
-  it('links a number only when the report registry knows its key', async () => {
+  it('links each part to the report that holds it, with its bucket; a tile without part links opens its report (D-381)', async () => {
     renderPage();
     await waitFor(() => expect(tile('Safety')).toHaveAttribute('data-state', 'ready'));
-    expect(tile('Safety').closest('a')).toHaveAttribute('href', '/fleet/reports/capa-tracker');
-    // Fleet certificates (X5-03B), hours of rest (X5-10A) and the work list (X5-10B) are registered.
-    expect(tile('Document alerts').closest('a')).toHaveAttribute('href', '/fleet/reports/fleet-certificates');
+    // Parts that link make the parts the links: the tile itself is not one (no link inside a link).
+    expect(tile('Safety').closest('a')).toBeNull();
+    expect(within(tile('Safety')).getByRole('link', { name: '4 open actions, 2 overdue' })).toHaveAttribute('href', '/fleet/reports/capa-tracker?status=open');
+    expect(within(tile('Safety')).getByRole('link', { name: '1 overdue drill' })).toHaveAttribute('href', '/fleet/reports/overdue-drills');
+    expect(tile('Document alerts').closest('a')).toBeNull();
+    const docs = within(tile('Document alerts'));
+    expect(docs.getByRole('link', { name: '2 expired certificates' })).toHaveAttribute('href', '/fleet/reports/fleet-certificates?status=expired');
+    expect(docs.getByRole('link', { name: '1 expired crew document' })).toHaveAttribute('href', '/fleet/reports/crew-documents?status=expired');
+    expect(docs.getByRole('link', { name: '1 expired qualification' })).toHaveAttribute('href', '/fleet/reports/crew-documents?status=expired');
+    expect(docs.getByRole('link', { name: '1 endorsement overdue' })).toHaveAttribute('href', '/fleet/reports/fleet-certificates');
+    expect(docs.getByRole('link', { name: '3 expiring' })).toHaveAttribute('href', '/fleet/reports/fleet-certificates?status=due');
+    // Hours of rest (X5-10A) and the work list (X5-10B): plain parts, the tile opens the report.
     expect(tile('Hours of rest').closest('a')).toHaveAttribute('href', '/fleet/reports/hours-of-rest');
     expect(tile('Technical').closest('a')).toHaveAttribute('href', '/fleet/reports/work-list');
+  });
+
+  it('keeps the C-1 expiring split through the answer schema: one link per source (D-381)', async () => {
+    state.answers.fleet_dashboard_kpis = ok(
+      kpis({
+        documents: {
+          state: 'ok',
+          value: 4,
+          vessels: 3,
+          parts: { ...ZERO_PARTS, expiring: 4, expiring_vessel_certificates: 1, expiring_crew_items: 3 },
+        },
+      }),
+    );
+    renderPage();
+    await waitFor(() => expect(tile('Document alerts')).toHaveAttribute('data-state', 'ready'));
+    const docs = within(tile('Document alerts'));
+    expect(docs.getByRole('link', { name: '1 expiring certificate' })).toHaveAttribute('href', '/fleet/reports/fleet-certificates?status=due');
+    expect(docs.getByRole('link', { name: '3 expiring crew items' })).toHaveAttribute('href', '/fleet/reports/crew-documents?status=due');
+  });
+
+  it('a real zero tile opens its report as a whole', async () => {
+    state.answers.fleet_dashboard_kpis = ok(
+      kpis({
+        documents: { state: 'ok', value: 0, vessels: 3, parts: ZERO_PARTS },
+        safety: { state: 'ok', value: 0, vessels: 3, open_corrective_actions: 0, overdue_corrective_actions: 0, overdue_drills: 0 },
+      }),
+    );
+    renderPage();
+    await waitFor(() => expect(tile('Safety')).toHaveAttribute('data-state', 'zero'));
+    expect(tile('Safety').closest('a')).toHaveAttribute('href', '/fleet/reports/capa-tracker');
+    expect(tile('Document alerts').closest('a')).toHaveAttribute('href', '/fleet/reports/fleet-certificates');
   });
 });
 
@@ -378,6 +419,17 @@ describe('the ranked lists', () => {
     expect(within(lists).queryByRole('region', { name: /Insurance/ })).toBeNull();
     expect(within(lists).getByRole('region', { name: 'Audits and surveys' })).toHaveTextContent('No audit or survey in the next 90 days.');
     expect(within(lists).getByRole('region', { name: 'Work list' })).toHaveTextContent('2 overdue');
+  });
+
+  it('"View all" opens the report that holds what the list ranks (D9; D-381)', async () => {
+    renderPage();
+    const lists = await screen.findByTestId('fleet-dashboard-lists');
+    const viewAll = (region: string) => within(within(lists).getByRole('region', { name: region })).getByRole('link', { name: /^View all/ });
+    expect(viewAll('Vessel certificates')).toHaveAttribute('href', '/fleet/reports/fleet-certificates');
+    expect(viewAll('Crew documents')).toHaveAttribute('href', '/fleet/reports/crew-documents');
+    // The qualifications list ranks expiry items: the Crew documents report lists them, not the requirement compliance (R5).
+    expect(viewAll('Crew qualifications')).toHaveAttribute('href', '/fleet/reports/crew-documents');
+    expect(viewAll('Corrective actions')).toHaveAttribute('href', '/fleet/reports/capa-tracker?status=open');
   });
 
   it('a failed read of the lists is an error with Retry, the tiles unaffected', async () => {

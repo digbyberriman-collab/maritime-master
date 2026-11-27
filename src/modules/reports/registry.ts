@@ -16,8 +16,11 @@
  * - `personalData`: the report shows or exports data about people (EX4,
  *   D-X5-12); the export engine refuses it while the export log is not set
  *   up.
- * - `exporters`: the formats its ExportMenu offers (PR-13's engine); empty
- *   for a legacy page with its own export.
+ * - `exporters`: the formats its ExportMenu offers (PR-13's engine). A
+ *   registry page (`load`) always has at least one: it exports the rows on
+ *   screen through ReportShell. A legacy page (`href`) has none and says
+ *   who will add its export (`exportDeferred`; D-384): the hub shows "No
+ *   export yet" on its card and the page offers no export control.
  *
  * Adding a report: one entry here (unique key, a group of
  * `REPORT_GROUPS`, a capability of the catalogue) and its component under
@@ -68,8 +71,13 @@ interface ReportDefinitionBase {
 
 /** A registry-driven report page, or a legacy page that keeps its own route. */
 export type ReportDefinition =
-  | (ReportDefinitionBase & { load: ReportLoader; href?: never })
-  | (ReportDefinitionBase & { href: string; load?: never });
+  | (ReportDefinitionBase & { load: ReportLoader; href?: never; exportDeferred?: never })
+  | (ReportDefinitionBase & {
+      href: string;
+      load?: never;
+      /** Who adds the export of this legacy page, while it has none (D-384). */
+      exportDeferred?: string;
+    });
 
 export const REPORTS: readonly ReportDefinition[] = [
   {
@@ -209,6 +217,7 @@ export const REPORTS: readonly ReportDefinition[] = [
     capability: 'vessel.safety.incidents.view',
     personalData: false,
     exporters: [],
+    exportDeferred: 'X2 (R6)',
     href: 'incident-analytics',
   },
   {
@@ -221,6 +230,7 @@ export const REPORTS: readonly ReportDefinition[] = [
     capability: 'vessel.safety.capa.view',
     personalData: false,
     exporters: [],
+    exportDeferred: 'X2 (R6)',
     href: 'capa-tracker',
   },
   {
@@ -233,6 +243,7 @@ export const REPORTS: readonly ReportDefinition[] = [
     capability: 'vessel.safety.drills.view',
     personalData: false,
     exporters: [],
+    exportDeferred: 'X5 wave 2',
     href: 'drill-analytics',
   },
   {
@@ -272,6 +283,7 @@ export const REPORTS: readonly ReportDefinition[] = [
     capability: 'vessel.safety.emergency_response.view',
     personalData: false,
     exporters: [],
+    exportDeferred: 'X5 wave 2',
     href: 'risk-overview',
   },
 ];

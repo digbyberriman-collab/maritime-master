@@ -272,7 +272,7 @@ describe('crew nav', () => {
     expect(describeElement(resolveUrl(appRouteObjects(), '/v/dra/crew/employment-history?dept=deck').element)).toContain('EmploymentHistoryPage.tsx');
   });
 
-  it('planned leaves have no route and carry the capability their page will need', () => {
+  it('planned leaves have no route; Appraisals and Visitors carry their future gate, Checklists none until X5 defines its key (C64, D-271)', () => {
     const routed = new Set(CREW_ROUTES.map((r) => r.path));
     const planned = crewLeaves.filter((f) => f.node.status !== 'live' && f.node.status !== 'beta');
     expect(planned.map((f) => f.node.label)).toEqual(['Checklists', 'Performance Appraisals', 'Visitors & Occasional Workers']);
@@ -282,6 +282,8 @@ describe('crew nav', () => {
     }
     expect(byLabel('Performance Appraisals').capability).toBe(CREW_CAPS.appraisalsView);
     expect(byLabel('Visitors & Occasional Workers').capability).toBe(CREW_CAPS.crewListView);
+    // X1 spec §4 gives Checklists no key and the catalogue has none yet: no invented gate.
+    expect(byLabel('Checklists').capability).toBeUndefined();
     for (const f of planned) if (f.node.capability) expect(catalogue.has(f.node.capability), f.node.capability).toBe(true);
   });
 

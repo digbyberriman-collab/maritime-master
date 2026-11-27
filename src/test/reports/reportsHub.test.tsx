@@ -251,9 +251,18 @@ describe('reports hub: current position', () => {
     expect(within(section).queryByText('Hours of rest')).toBeNull(); // no access: hidden
     expect(within(section).queryByText(/Leave/)).toBeNull();
     expect(within(section).getByText(/2 expired certificates/)).toBeInTheDocument();
-    // Document alerts opens Fleet certificates, Safety the CAPA tracker and Technical the work list (X5-10B).
-    const links = within(section).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(links).toEqual(['/fleet/reports/fleet-certificates', '/fleet/reports/capa-tracker', '/fleet/reports/work-list']);
+    // Each part opens the report that holds it with its bucket (D-381); Technical's parts are plain, so the tile opens the work list (X5-10B).
+    const links = within(section).getAllByRole('link').map((a) => [a.textContent, a.getAttribute('href')]);
+    expect(links).toEqual([
+      ['2 expired certificates', '/fleet/reports/fleet-certificates?status=expired'],
+      ['1 expired crew document', '/fleet/reports/crew-documents?status=expired'],
+      ['1 expired qualification', '/fleet/reports/crew-documents?status=expired'],
+      ['1 endorsement overdue', '/fleet/reports/fleet-certificates'],
+      ['3 expiring', '/fleet/reports/fleet-certificates?status=due'],
+      ['4 open actions, 2 overdue', '/fleet/reports/capa-tracker?status=open'],
+      ['1 overdue drill', '/fleet/reports/overdue-drills'],
+      [expect.stringContaining('Technical'), '/fleet/reports/work-list'],
+    ]);
   });
 });
 
@@ -352,6 +361,10 @@ describe('reports hub: catalogue', () => {
       '/fleet/reports/risk-overview',
     ]);
     expect(within(catalogue).queryByText('CAPA tracker')).toBeNull();
+    // The legacy reports cannot export yet and say so on their card (R19, D-384); the registry reports export.
+    const card = (title: string) => within(catalogue).getByText(title).closest('a') as HTMLElement;
+    for (const title of ['Incident analytics', 'Drill analytics', 'Risk overview']) expect(card(title), title).toHaveTextContent('No export yet');
+    for (const title of ['Vessel comparison', 'Overdue drills', 'Work list']) expect(card(title), title).not.toHaveTextContent('No export yet');
   });
 
   it('shows nothing of the catalogue while the access loads, and says so when nothing may be opened', async () => {

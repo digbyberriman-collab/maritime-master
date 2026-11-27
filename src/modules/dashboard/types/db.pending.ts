@@ -24,6 +24,23 @@ import type { Json } from '@/integrations/supabase/types';
 /** A tile's server state: `ok` with numbers, or why there are none. */
 export type FleetTileState = 'ok' | 'no_access' | 'module_off';
 
+/** The document alerts tile's parts. */
+export interface FleetDocumentsParts {
+  expired_vessel_certificates: number;
+  expired_crew_documents: number;
+  expired_crew_qualifications: number;
+  endorsements_overdue: number;
+  expiring: number;
+  /**
+   * `expiring` split by source (C-1, D-381): vessel certificates and every
+   * other item the tile counts; the two add up to `expiring`. Optional: an
+   * answer from before the split has neither, and the client then links
+   * `expiring` as one part.
+   */
+  expiring_vessel_certificates?: number;
+  expiring_crew_items?: number;
+}
+
 export type FleetDocumentsTileJson =
   | { state: 'no_access' }
   | {
@@ -31,13 +48,7 @@ export type FleetDocumentsTileJson =
       value: number;
       /** Vessels whose expiry items the caller may count. */
       vessels: number;
-      parts: {
-        expired_vessel_certificates: number;
-        expired_crew_documents: number;
-        expired_crew_qualifications: number;
-        endorsements_overdue: number;
-        expiring: number;
-      };
+      parts: FleetDocumentsParts;
     };
 
 export type FleetHoursOfRestTileJson =
@@ -191,7 +202,28 @@ export interface FleetDashboardPanelsJson {
   work_list: { state: 'no_access' } | { state: 'module_off' } | { state: 'ok'; vessels: FleetWorkListVessel[] };
 }
 
-/** One row of `fleet_vessel_comparison` (groups as jsonb; NULL = "–"). */
+/**
+ * The `documents` group of a `fleet_vessel_comparison` row as the SQL
+ * writes it (the row types it as `Json`, which the contract checker
+ * compares with the jsonb column). The by-source counts (C-1, D-381) are
+ * optional: an answer from before the split has none of them, and the
+ * report then shows one combined metric.
+ */
+export interface FleetVesselComparisonDocumentsJson {
+  value: number;
+  expired: number;
+  endorsements_overdue: number;
+  expiring: number;
+  /** Expired vessel certificates; with `expired_crew_items` adds up to `expired`. */
+  expired_vessel_certificates?: number;
+  /** Expired crew documents and qualifications. */
+  expired_crew_items?: number;
+  /** Expiring vessel certificates; with `expiring_crew_items` adds up to `expiring`. */
+  expiring_vessel_certificates?: number;
+  expiring_crew_items?: number;
+}
+
+/** One row of `fleet_vessel_comparison` (groups as jsonb; NULL = "–"; `documents`: FleetVesselComparisonDocumentsJson). */
 export type FleetVesselComparisonRow = {
   vessel_id: string;
   vessel_name: string;

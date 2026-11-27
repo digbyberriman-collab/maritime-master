@@ -79,11 +79,23 @@ describe('report registry', () => {
     for (const r of REPORTS) expect(catalogue.has(r.capability), `${r.key}: ${r.capability}`).toBe(true);
   });
 
-  it('a legacy page keeps its own exports; a registry page exports through the engine', () => {
+  it('a registry page exports through the engine; a report with no export names who adds it (R19, D-384)', () => {
     for (const r of REPORTS) {
-      if (r.href) expect(r.exporters, r.key).toEqual([]);
-      else expect(r.exporters.length, r.key).toBeGreaterThan(0);
+      if (r.load) {
+        expect(r.exporters.length, `${r.key}: a registry page exports`).toBeGreaterThan(0);
+        expect(r.exportDeferred, `${r.key}: only a legacy page defers its export`).toBeUndefined();
+      }
+      if (r.exporters.length === 0) {
+        expect(r.href, `${r.key}: only a legacy page may have no export`).toBeTruthy();
+        expect(r.exportDeferred?.trim(), `${r.key}: an export owner`).toBeTruthy();
+      } else {
+        expect(r.exportDeferred, `${r.key}: exports, so nothing is deferred`).toBeUndefined();
+      }
     }
+    // The four legacy hub pages and who adds their export.
+    expect(
+      Object.fromEntries(REPORTS.filter((r) => r.href).map((r) => [r.key, r.exportDeferred])),
+    ).toEqual({ 'incident-analytics': 'X2 (R6)', 'capa-tracker': 'X2 (R6)', 'drill-analytics': 'X5 wave 2', 'risk-overview': 'X5 wave 2' });
     expect(getReport('vessel-comparison', 'fleet')).toMatchObject({ personalData: false, exporters: ['csv', 'xlsx', 'pdf'] });
     // The crew reports show people: personal data, which the export engine refuses while the export log is not set up (D-X5-12).
     for (const key of ['crew-qualifications', 'hours-of-rest', 'agreements', 'contracts-ending']) {

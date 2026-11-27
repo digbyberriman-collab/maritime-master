@@ -99,6 +99,9 @@ const kpisSchema = z.object({
           expired_crew_qualifications: count,
           endorsements_overdue: count,
           expiring: count,
+          // C-1 split of `expiring` by source (D-381); absent in answers from before it.
+          expiring_vessel_certificates: count.optional(),
+          expiring_crew_items: count.optional(),
         }),
       }),
     ]),
@@ -239,7 +242,19 @@ const panelsSchema = z.object({
 });
 
 const comparisonGroups = {
-  documents: z.object({ value: count, expired: count, endorsements_overdue: count, expiring: count }).nullable(),
+  documents: z
+    .object({
+      value: count,
+      expired: count,
+      endorsements_overdue: count,
+      expiring: count,
+      // C-1 split by source (D-381); absent in answers from before it.
+      expired_vessel_certificates: count.optional(),
+      expired_crew_items: count.optional(),
+      expiring_vessel_certificates: count.optional(),
+      expiring_crew_items: count.optional(),
+    })
+    .nullable(),
   safety: z
     .object({ open_corrective_actions: count.nullable(), overdue_corrective_actions: count.nullable(), overdue_drills: count.nullable() })
     .nullable(),
@@ -254,7 +269,17 @@ export interface FleetVesselComparison {
   vessel_id: string;
   vessel_name: string;
   vessel_code: string | null;
-  documents: { value: number; expired: number; endorsements_overdue: number; expiring: number } | null;
+  /** The four by-source counts are optional (C-1, D-381): answers from before the split carry none. */
+  documents: {
+    value: number;
+    expired: number;
+    endorsements_overdue: number;
+    expiring: number;
+    expired_vessel_certificates?: number;
+    expired_crew_items?: number;
+    expiring_vessel_certificates?: number;
+    expiring_crew_items?: number;
+  } | null;
   safety: { open_corrective_actions: number | null; overdue_corrective_actions: number | null; overdue_drills: number | null } | null;
   technical: { open_jobs: number; overdue_jobs: number; pending_approval: number } | null;
   insurance: { expired: number; expiring: number } | null;

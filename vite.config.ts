@@ -21,25 +21,24 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Heavy libraries get their own chunks
-          'excel': ['exceljs'],
-          'pdf-gen': ['jspdf', 'html2canvas'],
-          'pdf-view': ['pdfjs-dist', 'react-pdf'],
-          'charts': ['recharts'],
-          'supabase': ['@supabase/supabase-js'],
-          // Vendor chunk for React ecosystem
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+        // Chunks by module path (function form): heavy libraries get their own
+        // chunks and load with the pages that use them (I6). The shared
+        // micro-modules (Vite's preload helper, clsx, tailwind-merge,
+        // tiny-invariant) go to the small React vendor chunk on purpose: left
+        // alone, Rollup puts them in whichever heavy chunk imports them first
+        // (react-pdf, recharts, jspdf), and the entry (or another heavy chunk)
+        // then loads and runs that chunk too.
+        manualChunks(id) {
+          if (id.includes('vite/preload-helper') || /\/node_modules\/(clsx|tailwind-merge|tiny-invariant)\//.test(id)) return 'vendor-react';
+          if (/\/node_modules\/(react|react-dom|react-router-dom|react-router|scheduler)\//.test(id)) return 'vendor-react';
+          if (id.includes('/node_modules/exceljs/')) return 'excel';
+          if (/\/node_modules\/(jspdf|html2canvas)\//.test(id)) return 'pdf-gen';
+          if (/\/node_modules\/(pdfjs-dist|react-pdf)\//.test(id)) return 'pdf-view';
+          if (id.includes('/node_modules/recharts/')) return 'charts';
+          if (id.includes('/node_modules/@supabase/supabase-js/')) return 'supabase';
           // UI components
-          'vendor-radix': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-select',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-tooltip',
-          ],
+          if (/\/node_modules\/@radix-ui\/react-(dialog|dropdown-menu|popover|select|tabs|toast|tooltip)\//.test(id)) return 'vendor-radix';
+          return undefined;
         },
       },
     },

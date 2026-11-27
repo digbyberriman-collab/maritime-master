@@ -369,6 +369,45 @@ describe('FleetKpiRow (also the vessel dashboard\'s legacy fleet view)', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  it('renders each part as a link to its report when the registry knows it, plain text otherwise (D-381)', () => {
+    renderRow({ knownReportKeys: new Set(['fleet-certificates', 'crew-documents', 'work-list']), vesselsParam: 'DRA' });
+    // Documents: the part links, the tile is not itself a link (no link inside a link).
+    const docs = tile('Document alerts');
+    expect(docs.closest('a')).toBeNull();
+    expect(within(docs).getByRole('link', { name: '4 expiring' })).toHaveAttribute('href', '/fleet/reports/fleet-certificates?vessels=DRA&status=due');
+    // Technical: plain parts, the whole tile opens the work list.
+    expect(within(tile('Technical')).queryByRole('link')).toBeNull();
+    expect(tile('Technical').closest('a')).toHaveAttribute('href', '/fleet/reports/work-list?vessels=DRA');
+    expect(tile('Technical')).toHaveTextContent('1 job overdue');
+  });
+
+  it('splits expiring by source when the server does (C-1): one link per source', () => {
+    const split: FleetDashboardKpisJson = {
+      ...data,
+      tiles: {
+        ...data.tiles,
+        documents: {
+          state: 'ok',
+          value: 4,
+          vessels: 3,
+          parts: {
+            expired_vessel_certificates: 0,
+            expired_crew_documents: 0,
+            expired_crew_qualifications: 0,
+            endorsements_overdue: 0,
+            expiring: 4,
+            expiring_vessel_certificates: 1,
+            expiring_crew_items: 3,
+          },
+        },
+      },
+    };
+    renderRow({ kpis: { kind: 'ready', data: split }, knownReportKeys: new Set(['fleet-certificates', 'crew-documents']) });
+    const docs = within(tile('Document alerts'));
+    expect(docs.getByRole('link', { name: '1 expiring certificate' })).toHaveAttribute('href', '/fleet/reports/fleet-certificates?status=due');
+    expect(docs.getByRole('link', { name: '3 expiring crew items' })).toHaveAttribute('href', '/fleet/reports/crew-documents?status=due');
+  });
+
   it('has no raw palette colours left', () => {
     const { container } = renderRow();
     expect(container.innerHTML).not.toMatch(/(bg|text|border)-(amber|sky|emerald|rose|slate|violet|red|green|yellow|blue|orange)-\d/);

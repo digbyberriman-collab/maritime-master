@@ -8,6 +8,11 @@
  * - The W9 red rule, the sub-text parts, links only for report keys the
  *   registry knows, and the KpiTile view of every state (loading, not set
  *   up, error, ready, no access, module off, real zeros).
+ * - Each part links to a registry report that holds what it counts, with
+ *   its bucket in the query (D-381): certificate parts to the report on
+ *   CERTIFICATE_SOURCES, crew parts to Crew documents, drills to Overdue
+ *   drills, actions to the CAPA tracker; the tile's own link is the most
+ *   urgent part's.
  * - The module's wiring: the manifest's guard and nav leaf use the page's
  *   key, beta, and the module calls exactly the three RPCs of its pending
  *   types, each defined in an hour-04 migration.
@@ -24,6 +29,8 @@ import { MODULE_REGISTRY } from '@/app/registry/modules';
 import { getCatalogueEntry } from '@/lib/permissions/catalogue';
 import { ruleForCapability } from '@/lib/permissions/adaptor';
 import { parseCapabilityKey } from '@/lib/permissions/types';
+import { FLEET_REPORT_KEYS, getReport } from '@/modules/reports/registry';
+import { CERTIFICATE_SOURCES, CREW_SOURCE_KEYS, STATUS_FILTER } from '@/modules/reports/lib/expiryReports';
 import {
   FLEET_DASHBOARD_VIEW,
   FLEET_KPI_CAPABILITIES,
@@ -34,7 +41,10 @@ import {
   LEAVE_NOT_ENABLED_REASON,
   NOT_SET_UP_REASON,
   buildFleetKpiTiles,
+  fleetKpiPartLinks,
   fleetKpiParts,
+  fleetKpiTileHref,
+  fleetKpiTileOwnHref,
   fleetKpiTone,
   fleetReportHref,
   formatFreshnessUtc,
@@ -171,7 +181,16 @@ describe('report links', () => {
     expect(fleetReportHref('capa-tracker', KNOWN, { vessels: 'dra,hyd' })).toBe('/fleet/reports/capa-tracker?vessels=dra%2Chyd');
   });
 
-  it('name a report for every data tile', () => {
+  it('carry the status and type filters after the vessels, and leave empty values out', () => {
+    expect(fleetReportHref('capa-tracker', KNOWN, { vessels: 'dra', status: 'open' })).toBe('/fleet/reports/capa-tracker?vessels=dra&status=open');
+    expect(fleetReportHref('capa-tracker', KNOWN, { status: 'expired', type: 'training_records' })).toBe(
+      '/fleet/reports/capa-tracker?status=expired&type=training_records',
+    );
+    expect(fleetReportHref('capa-tracker', KNOWN, { vessels: null, status: '', type: null })).toBe('/fleet/reports/capa-tracker');
+    expect(fleetReportHref('fleet-certificates', KNOWN, { status: 'expired' })).toBeNull();
+  });
+
+  it('name the report a tile opens when none of its parts links (a zero, hours of rest, technical)', () => {
     expect(FLEET_KPI_REPORT_KEY).toEqual({
       documents: 'fleet-certificates',
       hours_of_rest: 'hours-of-rest',
@@ -276,7 +295,13 @@ describe('the tile views', () => {
     expect(t.documents).toMatchObject({ state: undefined, value: 8, tone: 'danger' });
     expect(t.documents.sub).toBe('2 expired certificates · 1 expired crew document · 1 expired qualification · 1 endorsement overdue · 3 expiring');
     expect(t.documents.href).toBeUndefined();
-    expect(t.safety).toMatchObject({ value: 5, tone: 'danger', href: '/fleet/reports/capa-tracker?vessels=dra' });
+    expect(t.documents.partLinks?.every((p) => p.href === undefined)).toBe(true);
+    // Overdue drills are the most urgent part, but this registry does not know their report: the actions link leads.
+    expect(t.safety).toMatchObject({ value: 5, tone: 'danger', href: '/fleet/reports/capa-tracker?vessels=dra&status=open' });
+    expect(t.safety.partLinks).toEqual([
+      { text: '4 open actions, 2 overdue', href: '/fleet/reports/capa-tracker?vessels=dra&status=open' },
+      { text: '1 overdue drill' },
+    ]);
     expect(t.hours_of_rest.href).toBeUndefined();
     expect(t.technical.href).toBeUndefined();
   });
@@ -316,6 +341,150 @@ describe('the tile views', () => {
     const watch = kpis({ hours_of_rest: { state: 'ok', value: 0, breach_days: 0, near_threshold: 2, crew_without_entries: 0, vessels_logging: 2, vessels_off: 0 } });
     const t = byKey(buildFleetKpiTiles({ kind: 'ready', data: watch }, { knownReportKeys: KNOWN }));
     expect(t.hours_of_rest).toMatchObject({ state: 'ready', value: 0, tone: 'warn', sub: '2 near the limit · 2 vessels logging' });
+  });
+});
+
+describe('part links (gap/02 W9, D9; D-381)', () => {
+  const OPTIONS = { knownReportKeys: FLEET_REPORT_KEYS, vesselsParam: 'DRA,ABC' };
+  const REGISTRY = read('src/modules/reports/registry.ts');
+  const EXPIRY = read('src/modules/reports/components/ExpiryItemsReport.tsx');
+
+  /** The component source of a registry report page (null for a legacy href page). */
+  function componentSource(key: string): string | null {
+    const block = REGISTRY.split(/\n {2}\{\n/).find((b) => b.includes(`key: '${key}',`));
+    const m = block ? /load: \(\) => import\('\.\/reports\/(\w+)'\)/.exec(block) : null;
+    return m ? read(`src/modules/reports/reports/${m[1]}.tsx`) : null;
+  }
+
+  /** What a part counts, by its words. */
+  type Holds = 'certificates' | 'crew' | 'drills' | 'corrective_actions';
+  function holds(text: string): Holds {
+    if (/overdue drill/.test(text)) return 'drills';
+    if (/open action/.test(text)) return 'corrective_actions';
+    if (/crew|qualification/.test(text)) return 'crew';
+    return 'certificates';
+  }
+  /** The bucket each part carries (undefined: the report's default view). */
+  function bucket(text: string): string | undefined {
+    if (/expired/.test(text)) return 'expired';
+    if (/expiring/.test(text)) return 'due';
+    if (/open action/.test(text)) return 'open';
+    return undefined;
+  }
+
+  /** Every part's link names a registry report whose sources cover the part, with the bucket and the vessels shown. */
+  function expectCovered(links: { text: string; href?: string }[]) {
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.href, link.text).toBeDefined();
+      const url = new URL(link.href ?? '', 'https://storm.example.test');
+      const key = url.pathname.replace('/fleet/reports/', '');
+      const report = getReport(key, 'fleet');
+      expect(report, `${link.text}: ${key} is a fleet report`).not.toBeNull();
+      expect(url.searchParams.get('vessels'), link.text).toBe('DRA,ABC');
+      expect(url.searchParams.get('status') ?? undefined, link.text).toBe(bucket(link.text));
+      const source = componentSource(key);
+      switch (holds(link.text)) {
+        case 'certificates':
+          // The certificates variant reads CERTIFICATE_SOURCES (the vessel certificates).
+          expect(source, link.text).toContain('variant="certificates"');
+          expect([...CERTIFICATE_SOURCES]).toEqual(['vessel_certificates']);
+          break;
+        case 'crew':
+          // The crew variant reads every crew source, qualifications and training records among them.
+          expect(source, link.text).toContain('variant="crew"');
+          for (const src of ['crew_documents', 'crew_certificates_legacy', 'training_records']) expect(CREW_SOURCE_KEYS, src).toContain(src);
+          break;
+        case 'drills':
+          expect(key, link.text).toBe('overdue-drills');
+          expect(report?.capability).toBe('vessel.safety.drills.view');
+          break;
+        case 'corrective_actions':
+          expect(key, link.text).toBe('capa-tracker');
+          expect(report?.capability).toBe('vessel.safety.capa.view');
+          break;
+      }
+      // An expiry report only gets a bucket its Status filter offers.
+      if (source?.includes('ExpiryItemsReport') && url.searchParams.get('status')) {
+        expect(STATUS_FILTER.options.map((o) => o.value), link.text).toContain(url.searchParams.get('status'));
+      }
+    }
+    expect(EXPIRY).toContain("variant === 'crew' ? crewSourcesFor(applied) : [...CERTIFICATE_SOURCES]");
+  }
+
+  it('documents without the expiring split: certificate parts to Fleet certificates, crew parts to Crew documents', () => {
+    const links = fleetKpiPartLinks('documents', kpis().tiles, OPTIONS);
+    expect(links.map((l) => l.text)).toEqual(['2 expired certificates', '1 expired crew document', '1 expired qualification', '1 endorsement overdue', '3 expiring']);
+    expectCovered(links);
+    expect(links.map((l) => l.href)).toEqual([
+      '/fleet/reports/fleet-certificates?vessels=DRA%2CABC&status=expired',
+      '/fleet/reports/crew-documents?vessels=DRA%2CABC&status=expired',
+      '/fleet/reports/crew-documents?vessels=DRA%2CABC&status=expired',
+      '/fleet/reports/fleet-certificates?vessels=DRA%2CABC',
+      '/fleet/reports/fleet-certificates?vessels=DRA%2CABC&status=due',
+    ]);
+  });
+
+  it('documents with the expiring split (C-1): one link per source that has items', () => {
+    const parts = { expired_vessel_certificates: 0, expired_crew_documents: 0, expired_crew_qualifications: 1, endorsements_overdue: 0, expiring: 7, expiring_vessel_certificates: 2, expiring_crew_items: 5 };
+    const tiles = kpis({ documents: { state: 'ok', value: 8, vessels: 2, parts } }).tiles;
+    const links = fleetKpiPartLinks('documents', tiles, OPTIONS);
+    expect(links.map((l) => l.text)).toEqual(['1 expired qualification', '2 expiring certificates', '5 expiring crew items']);
+    expectCovered(links);
+    expect(links[2].href).toBe('/fleet/reports/crew-documents?vessels=DRA%2CABC&status=due');
+    // One source with nothing expiring: only the other is linked.
+    const one = kpis({ documents: { state: 'ok', value: 4, vessels: 2, parts: { ...parts, expired_crew_qualifications: 0, expiring: 4, expiring_vessel_certificates: 0, expiring_crew_items: 4 } } }).tiles;
+    expect(fleetKpiPartLinks('documents', one, OPTIONS)).toEqual([{ text: '4 expiring crew items', href: '/fleet/reports/crew-documents?vessels=DRA%2CABC&status=due' }]);
+    // A split that does not add up is not trusted: one "expiring" part, as before.
+    const off = kpis({ documents: { state: 'ok', value: 7, vessels: 2, parts: { ...parts, expired_crew_qualifications: 0, expiring_crew_items: 9 } } }).tiles;
+    expect(fleetKpiParts('documents', off)).toEqual(['7 expiring']);
+  });
+
+  it('safety: actions to the CAPA tracker on open actions, overdue drills to Overdue drills', () => {
+    const links = fleetKpiPartLinks('safety', kpis().tiles, OPTIONS);
+    expect(links.map((l) => l.text)).toEqual(['4 open actions, 2 overdue', '1 overdue drill']);
+    expectCovered(links);
+    expect(links.map((l) => l.href)).toEqual([
+      '/fleet/reports/capa-tracker?vessels=DRA%2CABC&status=open',
+      '/fleet/reports/overdue-drills?vessels=DRA%2CABC',
+    ]);
+  });
+
+  it('hours of rest and technical parts are plain text; the tile opens its report', () => {
+    for (const key of ['hours_of_rest', 'technical'] as const) {
+      expect(fleetKpiPartLinks(key, kpis().tiles, OPTIONS).every((l) => l.href === undefined), key).toBe(true);
+    }
+    expect(fleetKpiTileHref('hours_of_rest', kpis().tiles, OPTIONS)).toBe('/fleet/reports/hours-of-rest?vessels=DRA%2CABC');
+    expect(fleetKpiTileHref('technical', kpis().tiles, OPTIONS)).toBe('/fleet/reports/work-list?vessels=DRA%2CABC');
+  });
+
+  it('the tile opens its most urgent part: expired, then endorsements, then expiring; overdue drills before actions', () => {
+    const tiles = kpis().tiles;
+    expect(fleetKpiTileHref('documents', tiles, OPTIONS)).toBe('/fleet/reports/fleet-certificates?vessels=DRA%2CABC&status=expired');
+    const zeroParts = { expired_vessel_certificates: 0, expired_crew_documents: 0, expired_crew_qualifications: 0, endorsements_overdue: 0, expiring: 0 };
+    const crewOnly = kpis({ documents: { state: 'ok', value: 3, vessels: 1, parts: { ...zeroParts, expired_crew_documents: 1, endorsements_overdue: 1, expiring: 1 } } }).tiles;
+    expect(fleetKpiTileHref('documents', crewOnly, OPTIONS)).toBe('/fleet/reports/crew-documents?vessels=DRA%2CABC&status=expired');
+    const endorsements = kpis({ documents: { state: 'ok', value: 2, vessels: 1, parts: { ...zeroParts, endorsements_overdue: 1, expiring: 1 } } }).tiles;
+    expect(fleetKpiTileHref('documents', endorsements, OPTIONS)).toBe('/fleet/reports/fleet-certificates?vessels=DRA%2CABC');
+    const expiring = kpis({ documents: { state: 'ok', value: 1, vessels: 1, parts: { ...zeroParts, expiring: 1 } } }).tiles;
+    expect(fleetKpiTileHref('documents', expiring, OPTIONS)).toBe('/fleet/reports/fleet-certificates?vessels=DRA%2CABC&status=due');
+    // A real zero opens the tile's report.
+    const zero = kpis({ documents: { state: 'ok', value: 0, vessels: 1, parts: zeroParts } }).tiles;
+    expect(fleetKpiTileHref('documents', zero, OPTIONS)).toBe('/fleet/reports/fleet-certificates?vessels=DRA%2CABC');
+    expect(fleetKpiTileHref('safety', tiles, OPTIONS)).toBe('/fleet/reports/overdue-drills?vessels=DRA%2CABC');
+    const noDrills = kpis({ safety: { state: 'ok', value: 4, vessels: 3, open_corrective_actions: 4, overdue_corrective_actions: 2, overdue_drills: 0 } }).tiles;
+    expect(fleetKpiTileHref('safety', noDrills, OPTIONS)).toBe('/fleet/reports/capa-tracker?vessels=DRA%2CABC&status=open');
+  });
+
+  it('the view carries the part links; a tile whose parts link is not itself a link (no link inside a link)', () => {
+    const t = byKey(buildFleetKpiTiles({ kind: 'ready', data: kpis() }, OPTIONS));
+    expect(t.documents.parts).toEqual(fleetKpiParts('documents', kpis().tiles));
+    expect(t.documents.partLinks?.map((p) => p.text)).toEqual(t.documents.parts);
+    expect(t.documents.href).toBe('/fleet/reports/fleet-certificates?vessels=DRA%2CABC&status=expired');
+    expect(fleetKpiTileOwnHref(t.documents)).toBeUndefined();
+    expect(fleetKpiTileOwnHref(t.safety)).toBeUndefined();
+    expect(fleetKpiTileOwnHref(t.hours_of_rest)).toBe('/fleet/reports/hours-of-rest?vessels=DRA%2CABC');
+    expect(fleetKpiTileOwnHref(t.technical)).toBe('/fleet/reports/work-list?vessels=DRA%2CABC');
   });
 });
 

@@ -69,17 +69,29 @@ import type { FleetDashboardPanelsJson } from '../types/db.pending';
 /** The report keys the report registry knows (C12): a number or "View all" links only to one of these. */
 const KNOWN_REPORT_KEYS: ReadonlySet<string> = FLEET_REPORT_KEYS;
 
-/** The report each ranked list's "View all" opens (gap/02 R-keys); a link only once the registry knows it. */
+/**
+ * The report each ranked list's "View all" opens (gap/02 R-keys, D9): the
+ * report that holds the items the list ranks; a link only once the
+ * registry knows it. Crew qualifications rank expiry items (qualifications
+ * and training courses), which the Crew documents report lists, not the
+ * requirement compliance of Crew qualifications (R5; D-381).
+ */
 const LIST_REPORT_KEY: Readonly<Record<PanelListKey, string | null>> = {
   vessel_certificates: 'fleet-certificates',
   crew_documents: 'crew-documents',
-  crew_qualifications: 'crew-qualifications',
+  crew_qualifications: 'crew-documents',
   corrective_actions: 'capa-tracker',
   overdue_drills: 'overdue-drills',
   hess: null,
   insurance: 'insurance',
   surveys: 'audits-surveys',
   work_list: 'work-list',
+};
+
+/** The Status filter a "View all" carries where the list is narrower than the report's default view. */
+const LIST_REPORT_STATUS: Readonly<Partial<Record<PanelListKey, string>>> = {
+  // The list ranks open actions; the CAPA tracker otherwise opens on every status.
+  corrective_actions: 'open',
 };
 
 /** The Vessel comparison report (X5-03A) behind "Compare all vessels". */
@@ -200,7 +212,7 @@ function FleetDashboardBody() {
   const vesselsParam = ready.isDefault ? null : params.get(VESSELS_SHOWN_PARAM);
   const panelScope: PanelScope = {
     scope: 'fleet',
-    viewAllHref: (list) => fleetReportHref(LIST_REPORT_KEY[list], KNOWN_REPORT_KEYS, { vessels: vesselsParam }),
+    viewAllHref: (list) => fleetReportHref(LIST_REPORT_KEY[list], KNOWN_REPORT_KEYS, { vessels: vesselsParam, status: LIST_REPORT_STATUS[list] }),
   };
 
   return (

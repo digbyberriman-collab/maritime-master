@@ -12,16 +12,27 @@
  * (coming up, awaiting approval, near the limit). Vessels sort by severe,
  * then watch, then name ("worst first").
  *
- * Links: a number opens the vessel's own page for it where one exists
- * (`vesselPath`): certificates, drills, the technical schedule, hours of
- * rest. Corrective actions have no vessel page yet (D-27): their numbers
- * open the fleet CAPA tracker. Insurance has no live page yet, so its
- * numbers are plain text.
+ * Links: a number opens the page that holds what it counts, with its
+ * filter (gap/02 W9, D15; D-381). Documents: when the server splits them
+ * by source (C-1: `expired_vessel_certificates`, `expired_crew_items`,
+ * `expiring_vessel_certificates`, `expiring_crew_items`), expired and
+ * expiring certificates open the Fleet certificates report on that vessel
+ * (`?vessels=<code>&status=expired|due`) and the crew items the Crew
+ * documents report (`?vessels=<code>&vessel=<code>&status=…`: the Vessel
+ * filter keeps people with no current vessel out); without the split one
+ * combined metric per bucket opens Fleet certificates and says
+ * "certificates and crew items" (`comparisonMetrics`). Endorsements open
+ * the vessel's certificates page. Corrective actions have no vessel page
+ * yet (D-27): their numbers open the fleet CAPA tracker on that vessel and
+ * bucket. Drills, the technical schedule and hours of rest open the
+ * vessel's own page (`vesselPath`). Insurance has no live page yet, so
+ * its numbers are plain text.
  */
 import type { Tone } from '@/components/ui/tones';
 import type { ExportColumn } from '@/lib/export';
 import { vesselPath } from '@/modules/vessels/lib/vesselCode';
 import type { FleetVesselComparison } from '@/modules/dashboard/hooks/useFleetDashboard';
+import type { FleetVesselComparisonDocumentsJson } from '@/modules/dashboard/types/db.pending';
 import { FLEET_REPORTS_ROOT } from '../paths';
 import type { ReportFilterSpec } from './reportFilters';
 
@@ -78,21 +89,118 @@ export interface ComparisonMetric {
   href: (code: string) => string | null;
 }
 
-const CAPA_TRACKER = `${FLEET_REPORTS_ROOT}/capa-tracker`;
+/** A report link under /fleet/reports with its query (values encoded, empty values left out). */
+function reportLink(key: string, query: Record<string, string>): string {
+  const search = new URLSearchParams(query).toString();
+  return `${FLEET_REPORTS_ROOT}/${key}${search ? `?${search}` : ''}`;
+}
 
+/** Fleet certificates on one vessel ("Vessels shown" = that vessel) in a bucket. */
+const certificatesOn = (code: string, status: 'expired' | 'due') => reportLink('fleet-certificates', { vessels: code, status });
+/** Crew documents on one vessel: the Vessel filter too, so people with no current vessel are left out. */
+const crewDocumentsOn = (code: string, status: 'expired' | 'due') => reportLink('crew-documents', { vessels: code, vessel: code, status });
+/** The CAPA tracker on one vessel (it filters one vessel at a time) and bucket. */
+const correctiveActionsOn = (code: string, status: 'open' | 'overdue') => reportLink('capa-tracker', { vessels: code, status });
+
+/** The documents group with the by-source counts the server may send (C-1, D-381). */
+type DocumentsGroup = NonNullable<FleetVesselComparison['documents']> &
+  Partial<Pick<FleetVesselComparisonDocumentsJson, 'expired_vessel_certificates' | 'expired_crew_items' | 'expiring_vessel_certificates' | 'expiring_crew_items'>>;
+
+export interface DocumentsBySource {
+  expiredCertificates: number;
+  expiredCrewItems: number;
+  expiringCertificates: number;
+  expiringCrewItems: number;
+}
+
+/**
+ * A row's documents split by source, or null: no documents group, or an
+ * answer from before the split (the four counts missing or not adding up
+ * to `expired` and `expiring`).
+ */
+export function documentsBySource(row: FleetVesselComparison): DocumentsBySource | null {
+  const d: DocumentsGroup | null = row.documents;
+  if (!d) return null;
+  const { expired_vessel_certificates: ec, expired_crew_items: ei, expiring_vessel_certificates: xc, expiring_crew_items: xi } = d;
+  if (typeof ec !== 'number' || typeof ei !== 'number' || typeof xc !== 'number' || typeof xi !== 'number') return null;
+  if (ec + ei !== d.expired || xc + xi !== d.expiring) return null;
+  return { expiredCertificates: ec, expiredCrewItems: ei, expiringCertificates: xc, expiringCrewItems: xi };
+}
+
+const ENDORSEMENTS_OVERDUE: ComparisonMetric = {
+  id: 'endorsements_overdue',
+  label: 'Endorsements overdue',
+  title: 'Endorsements overdue',
+  weight: 'severe',
+  value: (r) => r.documents?.endorsements_overdue ?? null,
+  href: (c) => vesselPath(c, 'certificates'),
+};
+
+/** Documents without the by-source split: one metric per bucket, opening the certificates report. */
+export const DOCUMENTS_COMBINED_METRICS: readonly ComparisonMetric[] = [
+  {
+    id: 'expired',
+    label: 'Expired',
+    title: 'Expired certificates and crew items',
+    weight: 'severe',
+    value: (r) => r.documents?.expired ?? null,
+    href: (c) => certificatesOn(c, 'expired'),
+  },
+  ENDORSEMENTS_OVERDUE,
+  {
+    id: 'expiring',
+    label: 'Expiring',
+    title: 'Certificates and crew items expiring within their window',
+    weight: 'watch',
+    value: (r) => r.documents?.expiring ?? null,
+    href: (c) => certificatesOn(c, 'due'),
+  },
+];
+
+/** Documents split by source (C-1): each count opens the report that holds it. */
+export const DOCUMENTS_BY_SOURCE_METRICS: readonly ComparisonMetric[] = [
+  {
+    id: 'expired_vessel_certificates',
+    label: 'Expired certificates',
+    title: 'Expired vessel certificates',
+    weight: 'severe',
+    value: (r) => documentsBySource(r)?.expiredCertificates ?? null,
+    href: (c) => certificatesOn(c, 'expired'),
+  },
+  {
+    id: 'expired_crew_items',
+    label: 'Expired crew documents',
+    title: 'Expired crew documents and qualifications',
+    weight: 'severe',
+    value: (r) => documentsBySource(r)?.expiredCrewItems ?? null,
+    href: (c) => crewDocumentsOn(c, 'expired'),
+  },
+  ENDORSEMENTS_OVERDUE,
+  {
+    id: 'expiring_vessel_certificates',
+    label: 'Expiring certificates',
+    title: 'Vessel certificates expiring within their window',
+    weight: 'watch',
+    value: (r) => documentsBySource(r)?.expiringCertificates ?? null,
+    href: (c) => certificatesOn(c, 'due'),
+  },
+  {
+    id: 'expiring_crew_items',
+    label: 'Expiring crew documents',
+    title: 'Crew documents and qualifications expiring within their window',
+    weight: 'watch',
+    value: (r) => documentsBySource(r)?.expiringCrewItems ?? null,
+    href: (c) => crewDocumentsOn(c, 'due'),
+  },
+];
+
+/**
+ * Each tab's metrics; Documents as the combined metrics, which every
+ * answer can fill. `comparisonMetrics` picks the by-source Documents
+ * metrics when the answer carries the split.
+ */
 export const COMPARISON_METRICS: Readonly<Record<ComparisonTab, readonly ComparisonMetric[]>> = {
-  documents: [
-    { id: 'expired', label: 'Expired', title: 'Expired documents', weight: 'severe', value: (r) => r.documents?.expired ?? null, href: (c) => vesselPath(c, 'certificates') },
-    {
-      id: 'endorsements_overdue',
-      label: 'Endorsements overdue',
-      title: 'Endorsements overdue',
-      weight: 'severe',
-      value: (r) => r.documents?.endorsements_overdue ?? null,
-      href: (c) => vesselPath(c, 'certificates'),
-    },
-    { id: 'expiring', label: 'Expiring', title: 'Expiring within their window', weight: 'watch', value: (r) => r.documents?.expiring ?? null, href: (c) => vesselPath(c, 'certificates') },
-  ],
+  documents: DOCUMENTS_COMBINED_METRICS,
   safety: [
     {
       id: 'overdue_corrective_actions',
@@ -100,7 +208,7 @@ export const COMPARISON_METRICS: Readonly<Record<ComparisonTab, readonly Compari
       title: 'Overdue corrective actions',
       weight: 'severe',
       value: (r) => r.safety?.overdue_corrective_actions ?? null,
-      href: () => CAPA_TRACKER,
+      href: (c) => correctiveActionsOn(c, 'overdue'),
     },
     { id: 'overdue_drills', label: 'Overdue drills', title: 'Overdue drills', weight: 'severe', value: (r) => r.safety?.overdue_drills ?? null, href: (c) => vesselPath(c, 'safety/drills') },
     {
@@ -109,7 +217,7 @@ export const COMPARISON_METRICS: Readonly<Record<ComparisonTab, readonly Compari
       title: 'Open corrective actions',
       weight: 'watch',
       value: (r) => r.safety?.open_corrective_actions ?? null,
-      href: () => CAPA_TRACKER,
+      href: (c) => correctiveActionsOn(c, 'open'),
     },
   ],
   technical: [
@@ -156,6 +264,18 @@ export const COMPARISON_METRICS: Readonly<Record<ComparisonTab, readonly Compari
   ],
 };
 
+/**
+ * A tab's metrics for this answer: on Documents, the by-source metrics
+ * when every vessel with a documents group carries the split (and at
+ * least one does), else the combined metrics. Other tabs: their metrics.
+ */
+export function comparisonMetrics(tab: ComparisonTab, rows: readonly FleetVesselComparison[]): readonly ComparisonMetric[] {
+  if (tab !== 'documents') return COMPARISON_METRICS[tab];
+  const withGroup = rows.filter((r) => r.documents !== null);
+  const split = withGroup.length > 0 && withGroup.every((r) => documentsBySource(r) !== null);
+  return split ? DOCUMENTS_BY_SOURCE_METRICS : DOCUMENTS_COMBINED_METRICS;
+}
+
 /** The KPI tile that totals each tab's first metric (short enough for a 2-up tile on a phone). */
 export const COMPARISON_LEAD_LABEL: Readonly<Record<ComparisonTab, string>> = {
   documents: 'Expired items',
@@ -181,7 +301,11 @@ export interface VesselFindings {
   watch: number;
 }
 
-/** A vessel's findings on a tab. A safety group with no counted part is not covered. */
+/**
+ * A vessel's findings on a tab. A safety group with no counted part is not
+ * covered. Documents count the same with or without the split (the parts
+ * add up to the combined counts).
+ */
 export function vesselFindings(row: FleetVesselComparison, tab: ComparisonTab): VesselFindings {
   const metrics = COMPARISON_METRICS[tab];
   const values = metrics.map((m) => m.value(row));
@@ -239,7 +363,12 @@ export interface ComparisonSummary {
   totals: Record<string, number | null>;
 }
 
-/** The KPI row of a tab, over every vessel in the answer (not only those shown by the filter). */
+/**
+ * The KPI row of a tab, over every vessel in the answer (not only those
+ * shown by the filter). `totals` are keyed by the tab's `COMPARISON_METRICS`
+ * ids (Documents: the combined buckets, whichever metrics the table shows),
+ * so the lead tile reads the same key with or without the split.
+ */
 export function comparisonSummary(rows: readonly FleetVesselComparison[], tab: ComparisonTab): ComparisonSummary {
   const metrics = COMPARISON_METRICS[tab];
   const totals: Record<string, number | null> = Object.fromEntries(metrics.map((m) => [m.id, null]));
@@ -262,13 +391,19 @@ export function comparisonSummary(rows: readonly FleetVesselComparison[], tab: C
 
 export const NOT_COVERED_REASON = 'Not covered: no access, or the module is off on this vessel';
 
-/** The export table of a tab: vessel, code, status, then the tab's numbers (blank = not covered). */
-export function comparisonExportColumns(tab: ComparisonTab): ExportColumn<FleetVesselComparison>[] {
+/**
+ * The export table of a tab: vessel, code, status, then the tab's numbers
+ * (blank = not covered). With the answer's rows, Documents export by source
+ * when the server splits them (`comparisonMetrics`); without, the combined
+ * columns the table shows.
+ */
+export function comparisonExportColumns(tab: ComparisonTab, rows?: readonly FleetVesselComparison[]): ExportColumn<FleetVesselComparison>[] {
+  const metrics = rows ? comparisonMetrics(tab, rows) : COMPARISON_METRICS[tab];
   return [
     { key: 'vessel', header: 'Vessel', value: (r) => r.vessel_name, width: 28 },
     { key: 'code', header: 'Code', value: (r) => r.vessel_code, width: 8 },
     { key: 'status', header: 'Status', value: (r) => findingsStatus(vesselFindings(r, tab)).label, width: 14 },
-    ...COMPARISON_METRICS[tab].map(
+    ...metrics.map(
       (m): ExportColumn<FleetVesselComparison> => ({ key: m.id, header: m.title, kind: 'number', value: (r) => m.value(r) }),
     ),
   ];

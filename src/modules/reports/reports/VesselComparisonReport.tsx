@@ -56,6 +56,7 @@ import {
   COMPARISON_TAB_PARAM,
   NOT_COVERED_REASON,
   comparisonExportColumns,
+  comparisonMetrics,
   comparisonRows,
   comparisonSummary,
   findingsStatus,
@@ -119,7 +120,7 @@ function StatusCell({ row, tab }: { row: FleetVesselComparison; tab: ComparisonT
   return <StatusPill tone={status.tone} label={status.label} />;
 }
 
-function columnsFor(tab: ComparisonTab): DataTableColumn<FleetVesselComparison>[] {
+function columnsFor(tab: ComparisonTab, metrics: readonly ComparisonMetric[]): DataTableColumn<FleetVesselComparison>[] {
   return [
     {
       id: 'vessel',
@@ -137,7 +138,7 @@ function columnsFor(tab: ComparisonTab): DataTableColumn<FleetVesselComparison>[
       minWidth: 132,
       cell: (r) => <StatusCell row={r} tab={tab} />,
     },
-    ...COMPARISON_METRICS[tab].map(
+    ...metrics.map(
       (m): DataTableColumn<FleetVesselComparison> => ({
         id: m.id,
         header: m.label,
@@ -153,7 +154,7 @@ function columnsFor(tab: ComparisonTab): DataTableColumn<FleetVesselComparison>[
   ];
 }
 
-function VesselCard({ row, tab }: { row: FleetVesselComparison; tab: ComparisonTab }) {
+function VesselCard({ row, tab, metrics }: { row: FleetVesselComparison; tab: ComparisonTab; metrics: readonly ComparisonMetric[] }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -161,7 +162,7 @@ function VesselCard({ row, tab }: { row: FleetVesselComparison; tab: ComparisonT
         <StatusCell row={row} tab={tab} />
       </div>
       <dl className="grid grid-cols-3 gap-x-3 gap-y-2">
-        {COMPARISON_METRICS[tab].map((m) => (
+        {metrics.map((m) => (
           <div key={m.id} className="min-w-0">
             <dt className="type-caption text-muted-foreground">{m.label}</dt>
             <dd className="text-sm">
@@ -310,9 +311,9 @@ export default function VesselComparisonReport({ definition }: ReportComponentPr
                 label={`Vessel comparison: ${COMPARISON_TAB_LABELS[t]}`}
                 noun={{ one: 'vessel', other: 'vessels' }}
                 rows={rows}
-                columns={columnsFor(t)}
+                columns={columnsFor(t, comparisonMetrics(t, data))}
                 getRowId={(r) => r.vessel_id}
-                renderCard={(r) => <VesselCard row={r} tab={t} />}
+                renderCard={(r) => <VesselCard row={r} tab={t} metrics={comparisonMetrics(t, data)} />}
                 isLoading={loading}
                 error={comparison.state === 'error' ? comparison.error : undefined}
                 onRetry={comparison.state === 'error' ? comparison.retry : undefined}
@@ -340,7 +341,7 @@ export default function VesselComparisonReport({ definition }: ReportComponentPr
       filters={filters}
       exportSpec={
         comparison.state === 'ready'
-          ? { kind: `Vessel comparison ${COMPARISON_TAB_LABELS[tab]}`, columns: comparisonExportColumns(tab), rows, params: exportParams }
+          ? { kind: `Vessel comparison ${COMPARISON_TAB_LABELS[tab]}`, columns: comparisonExportColumns(tab, data), rows, params: exportParams }
           : null
       }
       exportBlockedReason={exportBlockedReason}

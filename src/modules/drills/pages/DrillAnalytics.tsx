@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useId, useState, useMemo } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,7 @@ import {
 import { getDrillTypeColor } from '@/modules/drills/constants';
 
 const DrillAnalytics: React.FC = () => {
+  const exportReasonId = useId();
   const [selectedVessel, setSelectedVessel] = useState<string>('all');
   const [dateRange, setDateRange] = useState<string>('12');
 
@@ -220,10 +221,14 @@ const DrillAnalytics: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
+            {/* No export yet (R19, D-384; X5 wave 2): a disabled control with its reason, never a fake one. */}
+            <Button variant="outline" disabled aria-describedby={exportReasonId}>
+              <Download className="h-4 w-4 mr-2" aria-hidden="true" />
               Export
             </Button>
+            <span id={exportReasonId} className="type-caption text-muted-foreground">
+              Export is not available for this report yet
+            </span>
           </div>
         </div>
 
@@ -465,13 +470,7 @@ const DrillAnalytics: React.FC = () => {
         {/* Drill Performance Table */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Drill Performance Details</CardTitle>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export to Excel
-              </Button>
-            </div>
+            <CardTitle className="text-base">Drill Performance Details</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>

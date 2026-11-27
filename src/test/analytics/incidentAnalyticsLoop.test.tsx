@@ -94,6 +94,10 @@ describe("Incident Analytics fetches once per filter change", () => {
     expect(second).toBe(first);
     // Current + previous period for analytics, one for the vessel comparison.
     expect(first).toBeLessThanOrEqual(6);
+    // No fake Export (R19, D-384): the control is disabled with its reason.
+    const exportButton = screen.getByRole("button", { name: /export/i });
+    expect(exportButton).toBeDisabled();
+    expect(exportButton).toHaveAccessibleDescription("Export is not available for this report yet");
   });
 
   it("the hooks do not loop even when a caller rebuilds the range every render", async () => {

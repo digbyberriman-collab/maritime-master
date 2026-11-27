@@ -9,13 +9,15 @@
  *   shown" filter (D-X5-09), the period (`?period=3|6|12` months, default
  *   6), one freshness stamp and the Refresh that re-reads it (D-88).
  * - Current position: the dashboard's KPI tiles from `fleet_dashboard_kpis`
- *   (document alerts, hours of rest, safety, technical); a number opens its
- *   report once the registry knows it.
+ *   (document alerts, hours of rest, safety, technical); each part of a
+ *   tile opens the report that holds what it counts, with its bucket, once
+ *   the registry knows it (the dashboard's KpiSubParts).
  * - Trends: `fleet_report_trends` as Recharts bar charts on theme defaults
  *   (D-53), loaded lazily (../components/TrendCharts), one card per series
  *   the reader may count.
  * - All reports: the registry's fleet reports grouped, each card shown only
- *   to readers who hold its capability (useCan through useReportAccess).
+ *   to readers who hold its capability (useCan through useReportAccess); a
+ *   legacy report that cannot export yet says "No export yet" (D-384).
  *
  * D-01: while the trends RPC is missing the trends say "This report is not
  * set up yet"; any other error says so with Retry; never zeros and never
@@ -38,7 +40,8 @@ import { AccessDenied, EmptyState, PageEmpty, PageError, PageLoading } from '@/s
 import { useBrandingContext } from '@/shared/contexts/BrandingContext';
 import { FleetVesselsFilter, VESSELS_SHOWN_PARAM, useFleetVesselsShown } from '@/modules/fleet';
 import { dashboardKeys, useFleetDashboardKpis } from '@/modules/dashboard/hooks/useFleetDashboard';
-import { buildFleetKpiTiles, fleetKpisInput, type FleetKpiTileKey } from '@/modules/dashboard/lib/fleetKpiRules';
+import { buildFleetKpiTiles, fleetKpiTileOwnHref, fleetKpisInput, type FleetKpiTileKey } from '@/modules/dashboard/lib/fleetKpiRules';
+import { KpiSubParts } from '@/modules/dashboard/components/fleet/FleetKpiRow';
 import { REPORTS_CAPS } from '../paths';
 import { FLEET_REPORT_KEYS, REPORT_GROUPS, fleetReportPath, reportsForScope, type ReportDefinition } from '../registry';
 import { reportsKeys } from '../hooks/keys';
@@ -75,24 +78,6 @@ const TILE_ICONS: Readonly<Partial<Record<FleetKpiTileKey, LucideIcon>>> = {
   safety: ShieldAlert,
   technical: Wrench,
 };
-
-/** Sub-text parts that wrap between parts first (each part one box), as on the dashboard. */
-function SubParts({ parts }: { parts: readonly string[] }) {
-  const last = parts.length - 1;
-  return (
-    <>
-      {parts.map((part, i) => (
-        <React.Fragment key={part}>
-          <span className="inline-block">
-            {part}
-            {i < last ? '\u00a0·' : null}
-          </span>
-          {i < last ? ' ' : null}
-        </React.Fragment>
-      ))}
-    </>
-  );
-}
 
 function ReportsHubBody() {
   const { clientDisplayName, companyName } = useBrandingContext();
@@ -252,9 +237,9 @@ function CurrentPosition({ kpis, vesselsParam }: { kpis: ReturnType<typeof useFl
               label={tile.label}
               icon={TILE_ICONS[tile.key]}
               value={tile.value}
-              sub={tile.parts ? <SubParts parts={tile.parts} /> : tile.sub}
+              sub={tile.partLinks ? <KpiSubParts parts={tile.partLinks} /> : tile.sub}
               tone={tile.tone}
-              href={tile.href}
+              href={fleetKpiTileOwnHref(tile)}
               state={tile.state}
               zeroLabel={tile.zeroLabel}
               notEnabledReason={tile.notEnabledReason}
@@ -350,6 +335,7 @@ function ReportCard({ report, vesselsParam }: { report: ReportDefinition; vessel
           <Badge variant="neutral">{report.moduleChip}</Badge>
         </span>
         <span className="type-body-sm block text-muted-foreground">{report.description}</span>
+        {report.exportDeferred ? <span className="type-caption block text-muted-foreground">No export yet</span> : null}
       </span>
       <ArrowRight aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
     </Link>
