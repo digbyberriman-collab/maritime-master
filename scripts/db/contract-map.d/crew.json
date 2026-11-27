@@ -16,6 +16,13 @@
       "views": { "type": "WorkRestPendingViews", "expect": ["work_rest_breach_reviews"] },
       "columns": { "type": "WorkRestPendingColumns", "expect": ["vessel_work_rest_settings", "work_rest_monthly_submissions", "work_rest_non_conformities", "work_rest_signatures"] },
       "functions": { "type": "WorkRestPendingFunctions", "expect": ["work_rest_save_day", "work_rest_fill_days", "work_rest_month_transition", "work_rest_vessel_board", "work_rest_month_stats", "work_rest_vessel_breaches", "work_rest_review_breach", "work_rest_remind", "work_rest_breach_report_recipients", "work_rest_breach_report_create"] }
+    },
+    {
+      "file": "src/modules/rotation-planner/types/db.pending.ts",
+      "mirrors": "X1 spec §6 060900 (X1-09: the planner server: the leave types, the request periods and the vessel's leave approval step, the period-store columns of frp_rotation_assignments, the day-code ownership columns of crew_leave_entries, the profile of crew_leave_requests, and the planner RPCs: the vessel's periods, period upsert and delete, Add leave, the crew's own request, the decision, the leave settings, the On/Off toggle and manning by day)",
+      "tables": { "type": "PlannerPendingTables", "expect": ["leave_types", "crew_leave_request_periods", "crew_leave_settings"] },
+      "columns": { "type": "PlannerPendingColumns", "expect": ["frp_rotation_assignments", "crew_leave_entries", "crew_leave_requests"] },
+      "functions": { "type": "PlannerPendingFunctions", "expect": ["planner_vessel_periods", "planner_period_upsert", "planner_period_delete", "planner_add_leave", "crew_leave_request_submit", "crew_leave_request_decide", "planner_leave_settings_save", "crew_toggle_onboard", "vessel_manning_by_day"] }
     }
   ],
   "notMirrored": {

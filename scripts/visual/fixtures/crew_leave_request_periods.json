@@ -1,0 +1,38 @@
+[
+  {
+    "id": "c9200000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "request_id": "c9100000-0000-4000-8000-000000000001",
+    "leave_type_key": "holiday",
+    "start_date": "$date:+6",
+    "end_date": "$date:+19",
+    "end_unknown": false,
+    "sort_order": 0,
+    "created_at": "$ts:-10d",
+    "updated_at": "$ts:-10d"
+  },
+  {
+    "id": "c9200000-0000-4000-8000-000000000002",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "request_id": "c9100000-0000-4000-8000-000000000002",
+    "leave_type_key": "crew_development",
+    "start_date": "$date:+45",
+    "end_date": "$date:+49",
+    "end_unknown": false,
+    "sort_order": 0,
+    "created_at": "$ts:-1d",
+    "updated_at": "$ts:-1d"
+  },
+  {
+    "id": "c9200000-0000-4000-8000-000000000003",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "request_id": "c9100000-0000-4000-8000-000000000002",
+    "leave_type_key": "holiday",
+    "start_date": "$date:+50",
+    "end_date": "$date:+56",
+    "end_unknown": false,
+    "sort_order": 1,
+    "created_at": "$ts:-1d",
+    "updated_at": "$ts:-1d"
+  }
+]

@@ -1,5 +1,6 @@
 import type { RotationAssignment, LeaveOverlayEntry, ConflictInfo } from '../types';
 import { LEAVE_CODE_TO_TYPE } from '../constants';
+import { bandSpans, manningGapLabel, type ManningDayRow } from './manning';
 
 /**
  * Blocks are grouped by linked crew account when present, and otherwise by the
@@ -146,4 +147,68 @@ export function buildConflictItems(
   }
 
   return items.filter((i) => byId.has(i.primaryId));
+}
+// ---------------------------------------------------------------- manning gaps (gap/04 C47, W7; X1-09)
+
+/**
+ * A manning gap on the timeline: a run of days a position spends below its
+ * minimum of qualified crew aboard (the critical band of
+ * vessel_manning_by_day). It names no block, so it is its own kind beside
+ * the block conflicts: ConflictPanel resolves block conflicts, the
+ * timeline lists manning gaps in its Manning gaps rows.
+ */
+export interface ManningGapItem {
+  key: string;
+  kind: 'manning_gap';
+  severity: 'hard';
+  positionId: string | null;
+  positionName: string | null;
+  departmentKey: string | null;
+  reason: string;
+  start: string;
+  end: string;
+  days: number;
+  min: number;
+  shortBy: number;
+}
+
+/** Every item the timeline lists: block conflicts and manning gaps. */
+export type PlannerConflictItem = ConflictItem | ManningGapItem;
+
+export const isManningGapItem = (item: PlannerConflictItem): item is ManningGapItem => item.kind === 'manning_gap';
+
+/**
+ * The manning gaps of a window: one item per critical span of a position
+ * (bandSpans), optionally limited to spans that touch [from, to], in the
+ * order of bandSpans (start, then rank order). A span of a position that
+ * maps to no catalogue position keeps a null id and reads "Unmatched
+ * titles".
+ */
+export function buildManningGapItems(rows: readonly ManningDayRow[], window?: { from: string; to: string }): ManningGapItem[] {
+  return bandSpans(rows, 'critical')
+    .filter((s) => !window || (s.end >= window.from && s.start <= window.to))
+    .map((s) => ({
+      key: `manning:${s.positionId ?? 'unmatched'}:${s.start}`,
+      kind: 'manning_gap' as const,
+      severity: 'hard' as const,
+      positionId: s.positionId,
+      positionName: s.positionName,
+      departmentKey: s.departmentKey,
+      reason: manningGapLabel(s),
+      start: s.start,
+      end: s.end,
+      days: s.days,
+      min: s.min,
+      shortBy: s.worstShortBy,
+    }));
+}
+
+/** Block conflicts and manning gaps together: block conflicts first (they name a block to fix), then gaps by start. */
+export function buildPlannerConflictItems(
+  assignments: RotationAssignment[],
+  leave: LeaveOverlayEntry[],
+  manningRows: readonly ManningDayRow[],
+  window?: { from: string; to: string },
+): PlannerConflictItem[] {
+  return [...buildConflictItems(assignments, leave), ...buildManningGapItems(manningRows, window)];
 }
