@@ -26,9 +26,12 @@
  *     a page under the same leaf, with no leaf of its own. X1-10 rebuilt
  *     Familiarisation (beta, behind vessel.crew.familiarisation.view); a
  *     record at crew/familiarisation/:recordId is a page under its leaf.
- *     There is no Dashboard leaf yet: a planned leaf at the module root
- *     would turn today's crew -> crew/list redirect into a Coming Soon page
- *     (X1-10B adds it as beta with its page).
+ *     X1-10B added the Dashboard leaf at order 5 (beta, behind
+ *     vessel.crew.crew_list.view) with its page at the module root, crew:
+ *     the crew dashboard (KPI tiles, Action required, Onboarding, Hours of
+ *     rest and Documents cards). The site map's generated crew -> crew/list
+ *     redirect gives way to the manifest route (PR-X1-A part 3, PP3); the
+ *     leaf lights up only on crew itself, never on the pages under it.
  *   - `personal.my_work`: the user's own documents at /me/documents (X1-04B,
  *     PR-X1-J: beta behind vessel.crew.crew_certificates.view_own; the leaf
  *     is no longer planned, so its Coming Soon route is gone by itself).
@@ -49,7 +52,7 @@
  * §4 orders (same sequence as before) and the planned leaves' gates.
  */
 import {
-  Briefcase, CheckSquare, ClipboardCheck, Clock, FileCheck, FileText, Network, ShieldCheck, UserCheck, Users,
+  Briefcase, CheckSquare, ClipboardCheck, Clock, FileCheck, FileText, LayoutDashboard, Network, ShieldCheck, UserCheck, Users,
 } from 'lucide-react';
 import type { ModuleManifest } from '@/app/registry/types';
 import { L } from '@/config/navBuilders';
@@ -62,6 +65,12 @@ const manifest: ModuleManifest = {
   scopes: ['vessel', 'fleet', 'personal'],
   routes: CREW_ROUTES,
   nav: [
+    // X1-10B: the vessel crew dashboard at the module root (crew), beta behind crew list view (X1 spec §4).
+    {
+      slot: 'vessel.crew',
+      order: 5,
+      node: L('Dashboard', CREW_ROOT, { existing: CREW_ROOT, icon: LayoutDashboard, status: 'beta', capability: CREW_CAPS.crewListView }),
+    },
     // X1-02: one list (the roster folded in), beta behind its capability (X1 spec §4).
     {
       slot: 'vessel.crew',

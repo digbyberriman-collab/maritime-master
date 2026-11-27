@@ -28,7 +28,7 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 import manifest from '@/modules/crew/module';
 import { CREW_ROUTES, HOR_REPORT_PATH, MY_DOCUMENTS_PATH, PLANNER_TAB_PATH } from '@/modules/crew/routes';
 import { ADD_CREW_PATH } from '@/modules/crew/lib/addCrewSchema';
-import { CREW_CAPABILITIES, CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS } from '@/modules/crew/paths';
+import { CREW_CAPABILITIES, CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS, CREW_ROOT } from '@/modules/crew/paths';
 import { MODULE_REGISTRY } from '@/app/registry/modules';
 import { isRedirectDef, type PageRouteDef } from '@/app/registry/types';
 import { listCatalogueCapabilities } from '@/lib/permissions/catalogue';
@@ -47,6 +47,8 @@ const catalogue = new Set(listCatalogueCapabilities());
 
 /** Today's page for each crew path (PP3's pure move; X1-02 rebuilt the list and folded the roster in). */
 const TODAY: Record<string, string> = {
+  // X1-10B: the vessel crew dashboard at the module root (PR-X1-A part 3: it replaces the generated redirect to the list).
+  [`vessel ${CREW_ROOT}`]: '/src/modules/crew/pages/CrewDashboardPage.tsx',
   [`vessel ${CREW_PATHS.list}`]: '/src/modules/crew/pages/CrewListPage.tsx',
   // X1-06B: Crew Compliance (status and configuration) replaces the legacy crew documents page.
   [`vessel ${COMPLIANCE_TAB_PATH}`]: '/src/modules/crew/pages/CrewCompliancePage.tsx',
@@ -87,7 +89,7 @@ describe('crew routes', () => {
 
   it('keeps today\'s guard on every moved page (ProtectedRoute, as the old protectedPage); the rebuilt list is behind its capability', () => {
     for (const r of pages) {
-      if (r.path === CREW_PATHS.list) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.crewListView });
+      if (r.path === CREW_PATHS.list || r.path === CREW_ROOT) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.crewListView });
       else if (r.path === PROFILE_TAB_PATH || r.path === FAM_RECORD_PATH) expect(r.guard, r.path).toEqual({ kind: 'scope' });
       else if (r.path === CREW_PATHS.familiarisation) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.famView });
       else if (r.path === ADD_CREW_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.profilesCreate });
@@ -150,7 +152,7 @@ describe('crew routes', () => {
 describe('every vessel crew URL of today resolves to its page', () => {
   const routes = appRouteObjects();
   it.each([
-    ['/v/dra/crew', 'crew/pages/CrewListPage.tsx'],
+    ['/v/dra/crew', 'crew/pages/CrewDashboardPage.tsx'],
     ['/v/dra/crew/list', 'crew/pages/CrewListPage.tsx'],
     ['/v/dra/crew/list?positions=1', 'crew/pages/CrewListPage.tsx'],
     ['/v/dra/crew/list?tab=movements', 'crew/pages/CrewListPage.tsx'],
@@ -199,6 +201,7 @@ const byLabel = (label: string): NavChild => {
 describe('crew nav', () => {
   it('sits at the X1 spec §4 orders (the roster folded into the Crew List by X1-02)', () => {
     expect(crewLeaves.map((f) => [f.order, f.node.label])).toEqual([
+      [5, 'Dashboard'],
       [10, 'Crew List'],
       [20, 'Planner'],
       [30, 'Crew Compliance'],
@@ -222,9 +225,12 @@ describe('crew nav', () => {
     expect(all.filter((o, i) => all.indexOf(o) !== i)).toEqual([]);
   });
 
-  it('has no Dashboard leaf at the module root yet (crew still redirects to the list, X1-10B adds it)', () => {
-    expect(fragments.some((f) => f.node.path === 'crew' || f.node.label === 'Dashboard')).toBe(false);
-    expect(describeElement(resolveUrl(appRouteObjects(), '/v/dra/crew').element)).toContain('CrewListPage.tsx');
+  it('the Dashboard leaf sits at the module root, beta behind vessel.crew.crew_list.view, and crew renders the dashboard (X1-10B, PR-X1-A part 3)', () => {
+    expect(byLabel('Dashboard').path).toBe(CREW_ROOT);
+    expect(byLabel('Dashboard').status).toBe('beta');
+    expect(byLabel('Dashboard').capability).toBe(CREW_CAPS.crewListView);
+    expect(describeElement(resolveUrl(appRouteObjects(), '/v/dra/crew').element)).toContain('CrewDashboardPage.tsx');
+    expect(describeElement(resolveUrl(appRouteObjects(), '/v/dra/crew/list').element)).toContain('CrewListPage.tsx');
   });
 
   it('the rebuilt Crew List is beta behind vessel.crew.crew_list.view (X1-02); no Crew Roster leaf', () => {

@@ -1,0 +1,218 @@
+{
+  "vessel_id": "e0000000-0000-4000-8000-000000000001",
+  "today": "$date:+0",
+  "crewing": {
+    "allowed": true,
+    "total": 13,
+    "on_board": 5,
+    "on_leave": 1,
+    "pending": 5,
+    "on_transfer": 1,
+    "ashore": 1
+  },
+  "compliance": {
+    "allowed": true,
+    "total": 13,
+    "complete": 5,
+    "expiring": 1,
+    "missing": 5,
+    "expired": 2
+  },
+  "onboarding": {
+    "allowed": true,
+    "joiners": 7,
+    "open": 5,
+    "people": [
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000034",
+        "first_name": "Demo",
+        "last_name": "Junior Stew",
+        "preferred_name": null,
+        "position_name": "Steward",
+        "placement_kind": "planned",
+        "join_date": "$date:+3",
+        "percent": 86,
+        "passed": 6,
+        "known": 7,
+        "fam_required": 2,
+        "fam_completed": 0,
+        "familiarisation": [
+          {
+            "record_id": "f2000000-0000-4000-8000-000000000014",
+            "template_id": "f1000000-0000-4000-8000-000000000003",
+            "template_code": "FAM-DRA-2026-002",
+            "template_name": "Interior service familiarisation",
+            "status": "open",
+            "due_date": "$date:+17",
+            "overdue": false
+          }
+        ]
+      },
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000030",
+        "first_name": "Demo",
+        "last_name": "Junior Deckhand",
+        "preferred_name": null,
+        "position_name": "Deckhand",
+        "placement_kind": "pending_placement",
+        "join_date": "$date:-2",
+        "percent": 29,
+        "passed": 2,
+        "known": 7,
+        "fam_required": 2,
+        "fam_completed": 0,
+        "familiarisation": []
+      },
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000031",
+        "first_name": "Demo",
+        "last_name": "Second Officer",
+        "preferred_name": null,
+        "position_name": "Second Officer",
+        "placement_kind": "pending_placement",
+        "join_date": "$date:-6",
+        "percent": 57,
+        "passed": 4,
+        "known": 7,
+        "fam_required": 2,
+        "fam_completed": 0,
+        "familiarisation": [
+          {
+            "record_id": "f2000000-0000-4000-8000-000000000013",
+            "template_id": "f1000000-0000-4000-8000-000000000001",
+            "template_code": "FAM-2026-001",
+            "template_name": "24-hour safety familiarisation",
+            "status": "open",
+            "due_date": "$date:-5",
+            "overdue": true
+          }
+        ]
+      },
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000035",
+        "first_name": "Demo",
+        "last_name": "Electrician",
+        "preferred_name": null,
+        "position_name": null,
+        "placement_kind": "pending_placement",
+        "join_date": "$date:-6",
+        "percent": 71,
+        "passed": 5,
+        "known": 7,
+        "fam_required": 1,
+        "fam_completed": 0,
+        "familiarisation": []
+      },
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000036",
+        "first_name": "Demo",
+        "last_name": "Purser",
+        "preferred_name": null,
+        "position_name": "Purser",
+        "placement_kind": "assignment",
+        "join_date": "$date:-20",
+        "percent": 71,
+        "passed": 5,
+        "known": 7,
+        "fam_required": 2,
+        "fam_completed": 1,
+        "familiarisation": [
+          {
+            "record_id": "f2000000-0000-4000-8000-000000000011",
+            "template_id": "f1000000-0000-4000-8000-000000000001",
+            "template_code": "FAM-2026-001",
+            "template_name": "24-hour safety familiarisation",
+            "status": "completed",
+            "due_date": "$date:-19",
+            "overdue": false
+          },
+          {
+            "record_id": "f2000000-0000-4000-8000-000000000012",
+            "template_id": "f1000000-0000-4000-8000-000000000002",
+            "template_code": "FAM-DRA-2026-001",
+            "template_name": "Two-week vessel familiarisation",
+            "status": "in_progress",
+            "due_date": "$date:-6",
+            "overdue": true
+          }
+        ]
+      }
+    ]
+  },
+  "documents": {
+    "allowed": true,
+    "expired": 5,
+    "expiring": 5,
+    "people": [
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000013",
+        "first_name": "Demo",
+        "last_name": "Chief Engineer",
+        "preferred_name": null,
+        "expired": 4,
+        "expiring": 1,
+        "next_expiry": "$date:-40"
+      },
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000015",
+        "first_name": "Demo",
+        "last_name": "Chief Stew",
+        "preferred_name": null,
+        "expired": 1,
+        "expiring": 1,
+        "next_expiry": "$date:-12"
+      },
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000012",
+        "first_name": "Demo",
+        "last_name": "Chief Officer",
+        "preferred_name": null,
+        "expired": 0,
+        "expiring": 2,
+        "next_expiry": "$date:+22"
+      },
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000036",
+        "first_name": "Demo",
+        "last_name": "Purser",
+        "preferred_name": null,
+        "expired": 0,
+        "expiring": 1,
+        "next_expiry": "$date:+30"
+      }
+    ]
+  },
+  "hours_of_rest": {
+    "allowed": true,
+    "enabled": true,
+    "open_breaches": 3,
+    "unsubmitted": 2,
+    "month": "2026-10",
+    "people": [
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000014",
+        "first_name": "Demo",
+        "last_name": "Bosun",
+        "preferred_name": null,
+        "open_breaches": 2,
+        "unsubmitted": false
+      },
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000016",
+        "first_name": "Demo",
+        "last_name": "Deckhand",
+        "preferred_name": null,
+        "open_breaches": 1,
+        "unsubmitted": true
+      },
+      {
+        "profile_id": "b0000000-0000-4000-8000-000000000012",
+        "first_name": "Demo",
+        "last_name": "Chief Officer",
+        "preferred_name": null,
+        "open_breaches": 0,
+        "unsubmitted": true
+      }
+    ]
+  }
+}

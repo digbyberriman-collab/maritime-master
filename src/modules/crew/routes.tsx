@@ -69,6 +69,13 @@ export const PLANNER_TAB_PATH = `${CREW_PATHS.planner}/:tab`;
  * the legacy training page, and one record at crew/familiarisation/:recordId
  * (FamiliarisationRecordPage, scope guard; the page asks view, or view_own
  * for the caller's own record).
+ * X1-10B serves the vessel crew dashboard (CrewDashboardPage) at the module
+ * root, crew, behind vessel.crew.crew_list.view (the page asks again for the
+ * route vessel, and the server for every section): five KPI tiles, Action
+ * required, and the Onboarding, Hours of rest and Documents & certificates
+ * cards. PR-X1-A part 3 (PP3) makes the site map's generated crew ->
+ * crew/list redirect give way to a root a manifest routes, so this route is
+ * the only one at /v/:vesselCode/crew.
  * X1-04B adds the person's own documents at /me/documents (scope personal,
  * path `documents`, guard vessel.crew.crew_certificates.view_own; the page
  * asks again and the server answers only for the caller's own profile). The
@@ -102,6 +109,8 @@ const vesselScopePage = (path: string, loader: ManifestPageLoader): RouteDef => 
 const vesselRedirect = (path: string, redirectTo: string): RouteDef => ({ scope: 'vessel', path, redirectTo });
 
 export const CREW_ROUTES: readonly RouteDef[] = [
+  // The vessel crew dashboard (X1-10B; gap/04 C2, C18) at the module root, in place of the generated redirect to the list.
+  vesselCapabilityPage(CREW_ROOT, CREW_CAPS.crewListView, () => import('@/modules/crew/pages/CrewDashboardPage')),
   vesselCapabilityPage(CREW_PATHS.list, CREW_CAPS.crewListView, () => import('@/modules/crew/pages/CrewListPage')),
   // The roster is folded into the crew list (X1-02); old links land on the list, query kept.
   // Path-relative on purpose ('./' first): a leading '..' climbs one route in

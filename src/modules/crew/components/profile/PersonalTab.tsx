@@ -48,6 +48,7 @@ import { LANGUAGE_PROFICIENCIES, LANGUAGE_PROFICIENCY_LABEL, type Country } from
 import { BiographyCard } from './BiographyCard';
 import { CurrentEmploymentCard, Fact, FactGrid } from './CurrentEmploymentCard';
 import { LeaveBalanceCard } from './LeaveBalanceCard';
+import { OnboardingProgressCard } from './OnboardingProgressCard';
 import { SignatureCard } from './SignatureCard';
 
 
@@ -125,9 +126,11 @@ const LoadingCard: React.FC = () => (
 );
 
 /**
- * The Personal tab (gap/04 C17, C19, C21, C55): the person's identity and
- * personal details with their languages, edited in place (Cancel and Save,
- * RHF + zod, W1 field rules), beside Current employment, the Leave balance
+ * The Personal tab (gap/04 C17, C18, C19, C21, C55): the person's identity
+ * and personal details with their languages, edited in place (Cancel and
+ * Save, RHF + zod, W1 field rules), beside Onboarding (X1-10B: the eight
+ * checks of lib/onboarding.ts, each linking to its fix; shown to crew list
+ * viewers and to the person), Current employment, the Leave balance
  * (X1-09B: from the employment terms' allowance, else the vessel's leave
  * policy; shown to the person and to planner, leave and HR viewers),
  * Biography and the stored signature. Identity fields need an editor (HR or crew_profiles.edit
@@ -153,6 +156,7 @@ const PersonalTab: React.FC<ProfileTabProps> = ({ profile, vessel }) => {
     <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]" data-personal-mode={state.mode}>
       <div className="min-w-0 space-y-4">
         {legacy ? <LegacyPersonal state={state} /> : <PersonalDetailsCard state={state} profile={profile} mutations={mutations} />}
+        <OnboardingProgressCard vessel={vessel} profile={profile} />
       </div>
       <div className="min-w-0 space-y-4">
         <CurrentEmploymentCard vessel={vessel} profile={profile} nameOfVessel={nameOfVessel} />

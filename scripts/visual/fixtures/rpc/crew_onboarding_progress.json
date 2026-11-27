@@ -1,0 +1,436 @@
+[
+  {
+    "profile_id": "b0000000-0000-4000-8000-000000000034",
+    "user_id": "a0000000-0000-4000-8000-000000000034",
+    "first_name": "Demo",
+    "last_name": "Junior Stew",
+    "preferred_name": null,
+    "avatar_url": null,
+    "position_name": "Steward",
+    "department_key": "interior",
+    "placement_kind": "planned",
+    "join_date": "$date:+3",
+    "checks": [
+      {
+        "key": "photo",
+        "state": "pass"
+      },
+      {
+        "key": "signature",
+        "state": "unknown",
+        "detail": "not_set_up"
+      },
+      {
+        "key": "personal",
+        "state": "pass"
+      },
+      {
+        "key": "contact",
+        "state": "pass"
+      },
+      {
+        "key": "passport",
+        "state": "pass"
+      },
+      {
+        "key": "medical",
+        "state": "pass"
+      },
+      {
+        "key": "stcw_basic",
+        "state": "fail",
+        "detail": "3 of 4"
+      },
+      {
+        "key": "contract",
+        "state": "pass"
+      }
+    ],
+    "passed": 6,
+    "known": 7,
+    "percent": 86,
+    "fam_required": 2,
+    "fam_completed": 0,
+    "familiarisation": [
+      {
+        "record_id": "f2000000-0000-4000-8000-000000000014",
+        "template_id": "f1000000-0000-4000-8000-000000000003",
+        "template_code": "FAM-DRA-2026-002",
+        "template_name": "Interior service familiarisation",
+        "status": "open",
+        "due_date": "$date:+17",
+        "overdue": false
+      }
+    ],
+    "is_open": true
+  },
+  {
+    "profile_id": "b0000000-0000-4000-8000-000000000032",
+    "user_id": "a0000000-0000-4000-8000-000000000032",
+    "first_name": "Demo",
+    "last_name": "Third Engineer",
+    "preferred_name": null,
+    "avatar_url": null,
+    "position_name": "Third Engineer",
+    "department_key": "engineering",
+    "placement_kind": "planned",
+    "join_date": "$date:+12",
+    "checks": [
+      {
+        "key": "photo",
+        "state": "pass"
+      },
+      {
+        "key": "signature",
+        "state": "unknown",
+        "detail": "not_set_up"
+      },
+      {
+        "key": "personal",
+        "state": "pass"
+      },
+      {
+        "key": "contact",
+        "state": "pass"
+      },
+      {
+        "key": "passport",
+        "state": "pass"
+      },
+      {
+        "key": "medical",
+        "state": "pass"
+      },
+      {
+        "key": "stcw_basic",
+        "state": "pass",
+        "detail": "4 of 4"
+      },
+      {
+        "key": "contract",
+        "state": "pass"
+      }
+    ],
+    "passed": 7,
+    "known": 7,
+    "percent": 100,
+    "fam_required": 0,
+    "fam_completed": 0,
+    "familiarisation": [],
+    "is_open": false
+  },
+  {
+    "profile_id": "b0000000-0000-4000-8000-000000000030",
+    "user_id": null,
+    "first_name": "Demo",
+    "last_name": "Junior Deckhand",
+    "preferred_name": null,
+    "avatar_url": null,
+    "position_name": "Deckhand",
+    "department_key": "deck",
+    "placement_kind": "pending_placement",
+    "join_date": "$date:-2",
+    "checks": [
+      {
+        "key": "photo",
+        "state": "fail"
+      },
+      {
+        "key": "signature",
+        "state": "unknown",
+        "detail": "not_set_up"
+      },
+      {
+        "key": "personal",
+        "state": "fail"
+      },
+      {
+        "key": "contact",
+        "state": "fail"
+      },
+      {
+        "key": "passport",
+        "state": "pass"
+      },
+      {
+        "key": "medical",
+        "state": "pass"
+      },
+      {
+        "key": "stcw_basic",
+        "state": "fail",
+        "detail": "1 of 4"
+      },
+      {
+        "key": "contract",
+        "state": "fail"
+      }
+    ],
+    "passed": 2,
+    "known": 7,
+    "percent": 29,
+    "fam_required": 2,
+    "fam_completed": 0,
+    "familiarisation": [],
+    "is_open": true
+  },
+  {
+    "profile_id": "b0000000-0000-4000-8000-000000000031",
+    "user_id": null,
+    "first_name": "Demo",
+    "last_name": "Second Officer",
+    "preferred_name": null,
+    "avatar_url": null,
+    "position_name": "Second Officer",
+    "department_key": "bridge",
+    "placement_kind": "pending_placement",
+    "join_date": "$date:-6",
+    "checks": [
+      {
+        "key": "photo",
+        "state": "fail"
+      },
+      {
+        "key": "signature",
+        "state": "unknown",
+        "detail": "not_set_up"
+      },
+      {
+        "key": "personal",
+        "state": "pass"
+      },
+      {
+        "key": "contact",
+        "state": "pass"
+      },
+      {
+        "key": "passport",
+        "state": "pass"
+      },
+      {
+        "key": "medical",
+        "state": "fail"
+      },
+      {
+        "key": "stcw_basic",
+        "state": "fail",
+        "detail": "2 of 4"
+      },
+      {
+        "key": "contract",
+        "state": "pass"
+      }
+    ],
+    "passed": 4,
+    "known": 7,
+    "percent": 57,
+    "fam_required": 2,
+    "fam_completed": 0,
+    "familiarisation": [
+      {
+        "record_id": "f2000000-0000-4000-8000-000000000013",
+        "template_id": "f1000000-0000-4000-8000-000000000001",
+        "template_code": "FAM-2026-001",
+        "template_name": "24-hour safety familiarisation",
+        "status": "open",
+        "due_date": "$date:-5",
+        "overdue": true
+      }
+    ],
+    "is_open": true
+  },
+  {
+    "profile_id": "b0000000-0000-4000-8000-000000000035",
+    "user_id": null,
+    "first_name": "Demo",
+    "last_name": "Electrician",
+    "preferred_name": null,
+    "avatar_url": null,
+    "position_name": null,
+    "department_key": null,
+    "placement_kind": "pending_placement",
+    "join_date": "$date:-6",
+    "checks": [
+      {
+        "key": "photo",
+        "state": "fail"
+      },
+      {
+        "key": "signature",
+        "state": "unknown",
+        "detail": "not_set_up"
+      },
+      {
+        "key": "personal",
+        "state": "pass"
+      },
+      {
+        "key": "contact",
+        "state": "pass"
+      },
+      {
+        "key": "passport",
+        "state": "fail"
+      },
+      {
+        "key": "medical",
+        "state": "pass"
+      },
+      {
+        "key": "stcw_basic",
+        "state": "pass",
+        "detail": "4 of 4"
+      },
+      {
+        "key": "contract",
+        "state": "pass"
+      }
+    ],
+    "passed": 5,
+    "known": 7,
+    "percent": 71,
+    "fam_required": 1,
+    "fam_completed": 0,
+    "familiarisation": [],
+    "is_open": true
+  },
+  {
+    "profile_id": "b0000000-0000-4000-8000-000000000033",
+    "user_id": null,
+    "first_name": "Demo",
+    "last_name": "Sous Chef",
+    "preferred_name": null,
+    "avatar_url": null,
+    "position_name": "Sous Chef",
+    "department_key": "galley",
+    "placement_kind": "pending_placement",
+    "join_date": "$date:-6",
+    "checks": [
+      {
+        "key": "photo",
+        "state": "pass"
+      },
+      {
+        "key": "signature",
+        "state": "unknown",
+        "detail": "not_set_up"
+      },
+      {
+        "key": "personal",
+        "state": "pass"
+      },
+      {
+        "key": "contact",
+        "state": "pass"
+      },
+      {
+        "key": "passport",
+        "state": "pass"
+      },
+      {
+        "key": "medical",
+        "state": "pass"
+      },
+      {
+        "key": "stcw_basic",
+        "state": "pass",
+        "detail": "4 of 4"
+      },
+      {
+        "key": "contract",
+        "state": "pass"
+      }
+    ],
+    "passed": 7,
+    "known": 7,
+    "percent": 100,
+    "fam_required": 1,
+    "fam_completed": 1,
+    "familiarisation": [
+      {
+        "record_id": "f2000000-0000-4000-8000-000000000015",
+        "template_id": "f1000000-0000-4000-8000-000000000001",
+        "template_code": "FAM-2026-001",
+        "template_name": "24-hour safety familiarisation",
+        "status": "completed",
+        "due_date": "$date:-5",
+        "overdue": false
+      }
+    ],
+    "is_open": false
+  },
+  {
+    "profile_id": "b0000000-0000-4000-8000-000000000036",
+    "user_id": "a0000000-0000-4000-8000-000000000036",
+    "first_name": "Demo",
+    "last_name": "Purser",
+    "preferred_name": null,
+    "avatar_url": null,
+    "position_name": "Purser",
+    "department_key": "purser_office",
+    "placement_kind": "assignment",
+    "join_date": "$date:-20",
+    "checks": [
+      {
+        "key": "photo",
+        "state": "pass"
+      },
+      {
+        "key": "signature",
+        "state": "unknown",
+        "detail": "not_set_up"
+      },
+      {
+        "key": "personal",
+        "state": "pass"
+      },
+      {
+        "key": "contact",
+        "state": "fail"
+      },
+      {
+        "key": "passport",
+        "state": "pass"
+      },
+      {
+        "key": "medical",
+        "state": "pass"
+      },
+      {
+        "key": "stcw_basic",
+        "state": "pass",
+        "detail": "4 of 4"
+      },
+      {
+        "key": "contract",
+        "state": "fail"
+      }
+    ],
+    "passed": 5,
+    "known": 7,
+    "percent": 71,
+    "fam_required": 2,
+    "fam_completed": 1,
+    "familiarisation": [
+      {
+        "record_id": "f2000000-0000-4000-8000-000000000011",
+        "template_id": "f1000000-0000-4000-8000-000000000001",
+        "template_code": "FAM-2026-001",
+        "template_name": "24-hour safety familiarisation",
+        "status": "completed",
+        "due_date": "$date:-19",
+        "overdue": false
+      },
+      {
+        "record_id": "f2000000-0000-4000-8000-000000000012",
+        "template_id": "f1000000-0000-4000-8000-000000000002",
+        "template_code": "FAM-DRA-2026-001",
+        "template_name": "Two-week vessel familiarisation",
+        "status": "in_progress",
+        "due_date": "$date:-6",
+        "overdue": true
+      }
+    ],
+    "is_open": true
+  }
+]

@@ -2,7 +2,7 @@
   "routes": [
     "/fleet/planner :: <ModuleRoute{capability=\"vessel.crew.crew_scheduling.view\"}> > page(/src/modules/rotation-planner/pages/PlannerPage.tsx) guard=- layout=-",
     "/me/documents :: <ModuleRoute{capability=\"vessel.crew.crew_certificates.view_own\"}> > page(/src/modules/crew/pages/MyDocumentsPage.tsx) guard=- layout=-",
-    "/v/:vesselCode/crew :: redirect(list)",
+    "/v/:vesselCode/crew :: <ModuleRoute{capability=\"vessel.crew.crew_list.view\"}> > page(/src/modules/crew/pages/CrewDashboardPage.tsx) guard=- layout=-",
     "/v/:vesselCode/crew/appraisals :: <PlaceholderWrapper{title=\"Performance Appraisals\"}>",
     "/v/:vesselCode/crew/checklists :: <PlaceholderWrapper{title=\"Checklists\"}>",
     "/v/:vesselCode/crew/compliance :: redirect(status)",
@@ -23,6 +23,7 @@
   ],
   "nav": {
     "NAVIGATION_ITEMS": [
+      "    LayoutDashboard {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"vessel-crew-dashboard\",\"kind\":\"leaf\",\"label\":\"Dashboard\",\"path\":\"/v/:vesselCode/crew\",\"scope\":\"vessel\",\"status\":\"beta\"}",
       "    Users {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"vessel-crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"/v/:vesselCode/crew/list\",\"scope\":\"vessel\",\"status\":\"beta\"}",
       "    Network {\"capability\":\"vessel.crew.crew_scheduling.view\",\"id\":\"vessel-crew-planner\",\"kind\":\"leaf\",\"label\":\"Planner\",\"moduleSetting\":\"planner\",\"path\":\"/v/:vesselCode/crew/planner\",\"scope\":\"vessel\",\"status\":\"beta\"}",
       "    ShieldCheck {\"capability\":\"vessel.crew.crew_compliance.view\",\"id\":\"vessel-crew-compliance\",\"kind\":\"leaf\",\"label\":\"Crew Compliance\",\"path\":\"/v/:vesselCode/crew/compliance\",\"scope\":\"vessel\",\"status\":\"beta\"}",
@@ -35,6 +36,7 @@
       "    FileText {\"capability\":\"vessel.crew.crew_certificates.view_own\",\"id\":\"me-documents\",\"kind\":\"leaf\",\"label\":\"Documents\",\"path\":\"/me/documents\",\"scope\":\"personal\",\"status\":\"beta\"}"
     ],
     "VESSEL_MODULES": [
+      "  LayoutDashboard {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"crew-dashboard\",\"kind\":\"leaf\",\"label\":\"Dashboard\",\"path\":\"crew\",\"status\":\"beta\"}",
       "  Users {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"crew/list\",\"status\":\"beta\"}",
       "  Network {\"capability\":\"vessel.crew.crew_scheduling.view\",\"id\":\"crew-planner\",\"kind\":\"leaf\",\"label\":\"Planner\",\"moduleSetting\":\"planner\",\"path\":\"crew/planner\",\"status\":\"beta\"}",
       "  ShieldCheck {\"capability\":\"vessel.crew.crew_compliance.view\",\"id\":\"crew-compliance\",\"kind\":\"leaf\",\"label\":\"Crew Compliance\",\"path\":\"crew/compliance\",\"status\":\"beta\"}",
@@ -46,6 +48,7 @@
       "  Briefcase {\"capability\":\"hris.employee_records.contracts_employment.view\",\"id\":\"crew-employment-history\",\"kind\":\"leaf\",\"label\":\"Employment History\",\"path\":\"crew/employment-history\",\"status\":\"planned\"}"
     ],
     "buildVesselNav": [
+      "  LayoutDashboard {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"vessel-crew-dashboard\",\"kind\":\"leaf\",\"label\":\"Dashboard\",\"path\":\"/v/dra/crew\",\"scope\":\"vessel\",\"status\":\"beta\"}",
       "  Users {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"vessel-crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"/v/dra/crew/list\",\"scope\":\"vessel\",\"status\":\"beta\"}",
       "  Network {\"capability\":\"vessel.crew.crew_scheduling.view\",\"id\":\"vessel-crew-planner\",\"kind\":\"leaf\",\"label\":\"Planner\",\"moduleSetting\":\"planner\",\"path\":\"/v/dra/crew/planner\",\"scope\":\"vessel\",\"status\":\"beta\"}",
       "  ShieldCheck {\"capability\":\"vessel.crew.crew_compliance.view\",\"id\":\"vessel-crew-compliance\",\"kind\":\"leaf\",\"label\":\"Crew Compliance\",\"path\":\"/v/dra/crew/compliance\",\"scope\":\"vessel\",\"status\":\"beta\"}",
@@ -61,9 +64,6 @@
       "crew/appraisals Performance Appraisals",
       "crew/visitors Visitors & Occasional Workers",
       "crew/employment-history Employment History"
-    ],
-    "VESSEL_ROOT_REDIRECTS": [
-      "crew -> list"
     ]
   }
 }

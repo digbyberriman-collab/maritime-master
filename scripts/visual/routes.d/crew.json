@@ -1,5 +1,18 @@
 [
   {
+    "path": "/v/dra/crew",
+    "slug": "crew-dashboard",
+    "waitFor": "[data-crew-dashboard=\"ready\"] [data-onboarding-person]",
+    "note": "X1-10B: the vessel crew dashboard at the module root (gap/04 C2): the five KPI tiles (Crewing, Compliance, Onboarding, Documents, Hours of rest), each number linking to its list; Action required; the Onboarding card (open joiners with their checks and familiarisations), Hours of rest and Documents & certificates by crew member"
+  },
+  {
+    "path": "/v/dra/crew#crew-dashboard-documents",
+    "slug": "crew-dashboard-documents-anchor",
+    "waitFor": "[data-crew-dashboard=\"ready\"] [data-documents-person]",
+    "note": "X1-10B: a tile's anchor link lands on its card (the Documents & certificates card scrolled to and focused) (the harness compares the requested path with its hash, so the same page reads as a redirect: expectRedirect names it)",
+    "expectRedirect": "/v/dra/crew"
+  },
+  {
     "path": "/v/dra/crew/list?positions=1",
     "slug": "crew-positions-drawer",
     "waitFor": "[data-testid=\"positions-summary\"]",
@@ -101,7 +114,7 @@
     "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/personal",
     "slug": "crew-profile-personal",
     "waitFor": "[data-crew-profile=\"server\"] [data-personal-mode=\"server\"]",
-    "note": "X1-03: the routed crew profile, Personal tab: header with the prev/next switcher, Rotation schedule and Edit profile; personal details, languages, current employment and biography"
+    "note": "X1-03: the routed crew profile, Personal tab: header with the prev/next switcher, Rotation schedule and Edit profile; personal details, languages, current employment and biography. X1-10B: the Onboarding card (eight checks with their fixes, the percentage of the known checks, the familiarisations on the vessel). A fixture answers crew_onboarding_progress alike for every call, and the repo answer holds the vessel's recent joiners (the dashboard's), so with the repo fixtures the card says the Chief Stew is not on the crew today; until PR-X1-G gives a persona her row, capture it with a scratch --fixtures copy whose answer starts with her row."
   },
   {
     "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/personal?edit=1",
@@ -404,7 +417,7 @@
     "path": "/v/dra/crew/compliance/configuration",
     "slug": "crew-compliance-configuration",
     "waitFor": "[data-compliance-config] table",
-    "note": "X1-06B: Crew Compliance, Configuration: the vessel settings (passenger ship, crew uploads, transfer approval), the requirements x positions matrix with ticks, N options \u00b7 held by X, Equivalences, Add STCW basic set and Add requirement"
+    "note": "X1-06B: Crew Compliance, Configuration: the vessel settings (passenger ship, crew uploads, transfer approval), the requirements x positions matrix with ticks, N options · held by X, Equivalences, Add STCW basic set and Add requirement"
   },
   {
     "path": "/v/dra/crew/compliance/configuration",
