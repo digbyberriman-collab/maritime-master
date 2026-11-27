@@ -19,10 +19,10 @@
     },
     {
       "file": "src/modules/rotation-planner/types/db.pending.ts",
-      "mirrors": "X1 spec §6 060900 (X1-09: the planner server: the leave types, the request periods and the vessel's leave approval step, the period-store columns of frp_rotation_assignments, the day-code ownership columns of crew_leave_entries, the profile of crew_leave_requests, and the planner RPCs: the vessel's periods, period upsert and delete, Add leave, the crew's own request, the decision, the leave settings, the On/Off toggle and manning by day)",
+      "mirrors": "X1 spec §6 060900 (X1-09: the planner server: the leave types, the request periods and the vessel's leave approval step, the period-store columns of frp_rotation_assignments, the day-code ownership columns of crew_leave_entries, the profile of crew_leave_requests, and the planner RPCs: the vessel's periods, period upsert and delete, Add leave, the crew's own request, the decision, the leave settings, the On/Off toggle and manning by day); X1 spec §6 061200 (X1-13: crew import staging tenancy: the company column of crew_import and vessels_import, and crew_import_stage, the browser's only staging write; the redefined live sync_crew_import_to_profiles and the crew_import_active view keep their generated types)",
       "tables": { "type": "PlannerPendingTables", "expect": ["leave_types", "crew_leave_request_periods", "crew_leave_settings"] },
-      "columns": { "type": "PlannerPendingColumns", "expect": ["frp_rotation_assignments", "crew_leave_entries", "crew_leave_requests"] },
-      "functions": { "type": "PlannerPendingFunctions", "expect": ["planner_vessel_periods", "planner_period_upsert", "planner_period_delete", "planner_add_leave", "crew_leave_request_submit", "crew_leave_request_decide", "planner_leave_settings_save", "crew_toggle_onboard", "vessel_manning_by_day"] }
+      "columns": { "type": "PlannerPendingColumns", "expect": ["frp_rotation_assignments", "crew_leave_entries", "crew_leave_requests", "crew_import", "vessels_import"] },
+      "functions": { "type": "PlannerPendingFunctions", "expect": ["planner_vessel_periods", "planner_period_upsert", "planner_period_delete", "planner_add_leave", "crew_leave_request_submit", "crew_leave_request_decide", "planner_leave_settings_save", "crew_toggle_onboard", "vessel_manning_by_day", "crew_import_stage"] }
     },
     {
       "file": "src/modules/training/types/db.pending.ts",

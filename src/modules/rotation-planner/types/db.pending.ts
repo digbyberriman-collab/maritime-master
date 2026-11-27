@@ -16,6 +16,15 @@
  * On/Off toggle and manning by day. Every write is an RPC; the guards
  * refuse a signed-in direct write of the status, type and approval columns.
  *
+ * 20261124061200_crew_import_tenancy.sql (X1-13, D-181, D-X1-17): the
+ * company of each staged crew row and imported vessel (crew_import,
+ * vessels_import: read by planner viewers of that company only; a row
+ * nobody can attribute is the service role's) and crew_import_stage, the
+ * browser's only staging write: one outcome per row (staged, or refused
+ * with a reason and the field at fault). The redefined live
+ * sync_crew_import_to_profiles and the crew_import_active view keep their
+ * generated types.
+ *
  * Types only: the planner hooks build their client with
  * `pendingClient<PlannerPendingTables, NoPending, PlannerPendingFunctions, PlannerPendingColumns>()`.
  *
@@ -164,6 +173,70 @@ export type PlannerPeriodPayload = {
   end_unknown: boolean;
 };
 
+// ---------------------------------------------------------------- 061200 rows
+
+/** The new column of the staging tables (crew_import, vessels_import): NULL when no single company could be attributed. */
+export type CrewImportTenancyColumns = {
+  company_id: string | null;
+};
+
+/** What crew_import_stage did with one row. */
+export type CrewImportStageOutcome = 'staged' | 'refused';
+
+/** Why: created / updated for a staged row, the refusal otherwise (src/modules/rotation-planner/hooks/useCrewImportStage.ts words them). */
+export type CrewImportStageReason =
+  | 'created'
+  | 'updated'
+  | 'not_an_object'
+  | 'key_missing'
+  | 'key_invalid'
+  | 'duplicate_in_batch'
+  | 'invalid_value'
+  | 'field_too_long'
+  | 'invalid_email'
+  | 'invalid_crew_id'
+  | 'invalid_date_of_birth'
+  | 'name_missing'
+  | 'key_in_use'
+  | 'archived';
+
+/** One row of crew_import_stage's answer, in the order of p_rows (row_index from 0). */
+export type CrewImportStageRpcRow = {
+  row_index: number;
+  /** The trimmed staging key (airtable_id); null when the row had none. */
+  staging_key: string | null;
+  outcome: CrewImportStageOutcome;
+  reason: string | null;
+  /** The field at fault for a refusal that concerns one field. */
+  field: string | null;
+};
+
+/**
+ * One staged crew row as p_rows carries it. Only these fields are read; a
+ * field left out keeps its stored value on an existing row; '' and null
+ * store NULL. date_of_birth is a date-only string (YYYY-MM-DD).
+ */
+export type CrewImportStageRowPayload = {
+  airtable_id: string;
+  crew_id?: number | null;
+  vessel?: string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  casual_name?: string | null;
+  full_legal_name?: string | null;
+  preferred_name?: string | null;
+  personal_email?: string | null;
+  work_email?: string | null;
+  cellular_phone?: string | null;
+  secondary_phone?: string | null;
+  date_of_birth?: string | null;
+  nationality?: string | null;
+  role?: string | null;
+  department?: string | null;
+  repatriation?: string | null;
+};
+
 // ---------------------------------------------------------------- pending shapes
 
 export type PlannerPendingTables = {
@@ -177,6 +250,8 @@ export type PlannerPendingColumns = {
   frp_rotation_assignments: PendingColumns<FrpRotationAssignmentNewColumns>;
   crew_leave_entries: PendingColumns<CrewLeaveEntryNewColumns>;
   crew_leave_requests: PendingColumns<CrewLeaveRequestNewColumns>;
+  crew_import: PendingColumns<CrewImportTenancyColumns>;
+  vessels_import: PendingColumns<CrewImportTenancyColumns>;
 };
 
 export type PlannerPendingFunctions = {
@@ -220,4 +295,5 @@ export type PlannerPendingFunctions = {
     Returns: CrewToggleOnboardRpcRow[];
   };
   vessel_manning_by_day: { Args: { p_vessel_id: string; p_from: string; p_to: string }; Returns: VesselManningByDayRpcRow[] };
+  crew_import_stage: { Args: { p_company_id: string; p_rows: Json }; Returns: CrewImportStageRpcRow[] };
 };
