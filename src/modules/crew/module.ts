@@ -46,6 +46,9 @@
  *   expiring), the four hours-of-rest types from X1-08 (reminder, serious
  *   breach, breach report, correction requested). hor_breach_report links
  *   to the report page X1-08B serves (`crew/hours-of-rest/report?year=&report=`).
+ *   The transfer and employment types are live from X1-11 (submitted,
+ *   completed, employment ended); crew_transfer_submitted links to the
+ *   person's profile with `?transfer=<id>`, which opens the transfer wizard.
  *
  * Platform-prep PP3 moved the routes and leaves here from
  * src/config/sitemap.ts and src/routes/index.tsx unchanged; X1-01 set the
@@ -150,9 +153,10 @@ const manifest: ModuleManifest = {
     { key: 'hor_correction_requested', status: 'live', emitter: 'work_rest_review_breach() (X1-08)' },
     // Live from X1-10 (20261124061000; familiarisation.test.sql proves the emitter).
     { key: 'familiarisation_assigned', status: 'live', emitter: 'familiarisation_open_required() through familiarisation_notify_assigned() (X1-10)' },
-    { key: 'crew_transfer_submitted', status: 'deferred', emitter: 'transfer_crew_submit() (X1-11)' },
-    { key: 'crew_transfer_completed', status: 'deferred', emitter: 'transfer_crew() (X1-11)' },
-    { key: 'crew_employment_ended', status: 'deferred', emitter: 'crew_end_employment() (X1-11)' },
+    // Live from X1-11 (20261124061100; transfers.test.sql proves each emitter).
+    { key: 'crew_transfer_submitted', status: 'live', emitter: 'transfer_crew_submit() (X1-11)' },
+    { key: 'crew_transfer_completed', status: 'live', emitter: 'transfer_crew() and crew_transfers_complete_due() through crew_transfer_apply() (X1-11)' },
+    { key: 'crew_employment_ended', status: 'live', emitter: 'crew_end_employment() (X1-11)' },
   ],
 };
 

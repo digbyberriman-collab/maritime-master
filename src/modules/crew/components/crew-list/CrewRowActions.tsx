@@ -90,6 +90,9 @@ const DisabledAction: React.FC<{ label: string; reason: string; icon: React.Reac
  * holder of vessel.crew.crew_profiles.view on the vessel, and on the
  * viewer's own row. A pending placement has no assignment yet (D-225):
  * Transfer and Sign off say why they are not available instead of failing.
+ * Transfer opens the reviewed transfer wizard (X1-11, through the page's
+ * TransferCrewModal); on a person already on transfer it opens that
+ * transfer.
  */
 export const CrewRowActions: React.FC<CrewRowActionsProps> = ({ row, currentUserId, can, hoursOfRestPath, inviteFromMenu, onAction }) => {
   const scope = useScope();
@@ -181,7 +184,8 @@ export const CrewRowActions: React.FC<CrewRowActionsProps> = ({ row, currentUser
               variant="ghost"
               size="icon"
               className="size-8 [@media(pointer:coarse)]:size-11"
-              aria-label={`Transfer ${name}`}
+              aria-label={row.status === 'on_transfer' ? `Open the transfer of ${name}` : `Transfer ${name}`}
+              title={row.status === 'on_transfer' ? 'Open the transfer' : 'Transfer to another vessel'}
               onClick={() => onAction('transfer', row)}
             >
               <ArrowRightLeft aria-hidden="true" />

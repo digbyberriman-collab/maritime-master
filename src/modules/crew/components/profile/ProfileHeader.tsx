@@ -1,6 +1,6 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { CalendarRange, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import React, { Suspense, lazy, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowRightLeft, CalendarRange, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import PageHeader from '@/shared/components/layout/PageHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,17 @@ import { StatusPill } from '@/shared/components/status';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PendingLoginChip } from '@/modules/crew/components/crew-list/CrewStatusPill';
 import { profileStatusDetail, type CrewProfileSummary } from '@/modules/crew/hooks/useCrewProfile';
-import { CREW_PATHS } from '@/modules/crew/paths';
+import { CREW_CAPS, CREW_PATHS } from '@/modules/crew/paths';
+import { useCan } from '@/lib/permissions/useCan';
+import { useScope } from '@/app/router/scopeContext';
+
+// The transfer wizard (X1-11) loads only when it opens.
+const TransferEntry = lazy(() => import('@/modules/crew/components/transfer/TransferEntry'));
+
+/** The URL parameter that opens one transfer on the profile (crew_transfer_submitted links here). */
+export const TRANSFER_PARAM = 'transfer';
+/** D-225: a pending placement is changed on the profile, never transferred. */
+export const PENDING_TRANSFER_SENTENCE = 'Change the pending vessel on the profile.';
 
 const initials = (summary: CrewProfileSummary): string =>
   [summary.preferredName || summary.firstName, summary.lastName]
@@ -37,7 +47,10 @@ interface ProfileHeaderProps {
  * The profile header (gap/04 C16): the person's name (the page's h1), crew
  * number, position, department, their status on this vessel with its
  * reason, the switcher through the vessel's crew in rank order, the
- * Rotation schedule link and Edit profile.
+ * Rotation schedule link, Transfer (X1-11: the reviewed transfer wizard for
+ * a holder of crew_assignments.assign; a pending placement says why not,
+ * D-225; `?transfer=<id>` opens one transfer, the link of
+ * crew_transfer_submitted) and Edit profile.
  */
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   summary,
@@ -49,6 +62,20 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   editUnavailableReason,
   today,
 }) => {
+  const scope = useScope();
+  const routeVessel = scope.scope === 'vessel' ? scope.vessel ?? null : null;
+  const canAssign = useCan(CREW_CAPS.assignmentsAssign, { vesselId: routeVessel?.id ?? null });
+  const [params, setParams] = useSearchParams();
+  const linkedTransfer = params.get(TRANSFER_PARAM);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const closeTransfer = () => {
+    setTransferOpen(false);
+    if (linkedTransfer) {
+      const next = new URLSearchParams(params);
+      next.delete(TRANSFER_PARAM);
+      setParams(next, { replace: true });
+    }
+  };
   const position = summary.positionName ?? summary.positionText;
   const detail = profileStatusDetail(summary, nameOfVessel, today);
   const hasSwitcher = summary.memberCount !== null && summary.memberCount > 1;
@@ -81,6 +108,33 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         </Button>
       )}
     </div>
+  ) : null;
+
+  // Transfer (gap/04 C58): a holder of crew_assignments.assign on this vessel, for someone else on its crew.
+  const showTransfer = Boolean(routeVessel) && canAssign && summary.onVessel && !summary.isOwn && summary.source === 'server';
+  const pendingPlacement = summary.placementKind === 'pending_placement';
+  const transfer = showTransfer ? (
+    pendingPlacement ? (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" aria-disabled="true" onClick={(event) => event.preventDefault()} aria-describedby="profile-transfer-unavailable">
+              <ArrowRightLeft aria-hidden="true" />
+              Transfer
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">{PENDING_TRANSFER_SENTENCE}</TooltipContent>
+        </Tooltip>
+        <span id="profile-transfer-unavailable" className="sr-only">
+          {PENDING_TRANSFER_SENTENCE}
+        </span>
+      </TooltipProvider>
+    ) : (
+      <Button variant="outline" onClick={() => setTransferOpen(true)}>
+        <ArrowRightLeft aria-hidden="true" />
+        Transfer
+      </Button>
+    )
   ) : null;
 
   const edit = editPath ? (
@@ -129,6 +183,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               Rotation schedule
             </Link>
           </Button>
+          {transfer}
           {edit}
         </>
       }
@@ -148,6 +203,18 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         ) : null}
       </div>
       {detail ? <p className="mt-1 type-caption text-muted-foreground">{detail}</p> : null}
+      {routeVessel && (transferOpen || linkedTransfer) ? (
+        <Suspense fallback={null}>
+          <TransferEntry
+            open
+            onClose={closeTransfer}
+            vessel={{ id: routeVessel.id, companyId: routeVessel.company_id ?? null }}
+            profileId={summary.profileId}
+            personName={summary.displayName}
+            transferId={transferOpen ? null : linkedTransfer}
+          />
+        </Suspense>
+      ) : null}
     </PageHeader>
   );
 };

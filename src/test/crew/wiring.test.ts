@@ -50,7 +50,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe('pending types and the migrations', () => {
-  it('declares the tables and RPCs of 060100 to 060500 and 060600 (X1-06: requirement rows, the compliance views and RPCs)', () => {
+  it('declares the tables and RPCs of 060100 to 060600 and 061100 (X1-06: requirement rows, the compliance views and RPCs; X1-11: transfers)', () => {
     expect(pendingTables).toEqual([
       'ref_countries', 'ref_languages', 'departments', 'contract_types', 'positions', 'position_aliases', 'position_manning',
       'crew_movements', 'crew_transfers',
@@ -70,6 +70,10 @@ describe('pending types and the migrations', () => {
       'crew_requirement_row_save', 'crew_requirement_row_delete', 'crew_requirement_cell_set', 'crew_requirement_row_bulk',
       'crew_requirements_add_stcw_basic', 'crew_vessel_set_passenger', 'crew_vessel_settings_save', 'crew_document_type_create',
       'crew_document_type_satisfies_save',
+      // The controlled transfer and employment history (X1-11).
+      'transfer_crew_options', 'transfer_crew_start', 'transfer_crew_review', 'transfer_crew_acknowledge', 'transfer_crew_submit',
+      'transfer_crew_decide', 'transfer_crew_cancel', 'transfer_crew', 'transfer_crew_detail', 'crew_transfers_for_profile',
+      'crew_end_employment', 'crew_vessel_employment_history', 'crew_rehire_prefill',
     ]);
     expect(crewMigrationFiles).toEqual([
       '20261124060100_crew_reference_positions.sql',
@@ -84,6 +88,7 @@ describe('pending types and the migrations', () => {
       '20261124060900_crew_planner_periods.sql',
       // Familiarisation (X1-10): its types are the training module's pending file.
       '20261124061000_crew_familiarisation.sql',
+      '20261124061100_crew_transfers_employment.sql',
     ]);
   });
 
@@ -106,7 +111,7 @@ describe('pending types and the migrations', () => {
       'crew_caller_is_external', 'crew_cap_vessel_ids', 'crew_compliance_summary_rows', 'crew_document_visible_profile_ids', 'crew_profile_visible',
       'crew_requirement_status_rows', 'crew_vessel_cap', 'crew_visible_profile_ids',
     ]);
-    expect(entry?.columns).toEqual({ type: 'CrewPendingColumns', expect: ['crew_next_of_kin', 'crew_certificates'] });
+    expect(entry?.columns).toEqual({ type: 'CrewPendingColumns', expect: ['crew_next_of_kin', 'crew_certificates', 'crew_contracts'] });
   });
 
   it('every function the crew migrations create has a grants entry, and every table and view its relation entry', () => {

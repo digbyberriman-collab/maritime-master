@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -36,6 +36,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useVessels } from '@/modules/vessels/hooks/useVessels';
 import type { TransferCrewData, CrewMember } from '@/modules/crew/hooks/useCrew';
 import { isPendingPlacementAssignment } from '@/modules/crew/lib/crewUpdateErrors';
+import { useScope } from '@/app/router/scopeContext';
+
+// The reviewed transfer (X1-11) loads only when a transfer opens.
+const TransferEntry = lazy(() => import('@/modules/crew/components/transfer/TransferEntry'));
 
 /** D-225: a pending placement is not an assignment; a transfer waits until the login is linked. */
 export const TRANSFER_PENDING_MESSAGE =
@@ -58,12 +62,20 @@ interface TransferCrewModalProps {
   isLoading: boolean;
 }
 
-const TransferCrewModal: React.FC<TransferCrewModalProps> = ({
+/**
+ * The legacy two-step transfer (D-225 fixed: a pending placement is refused
+ * before anything is written, refusals read as STORM sentences, a half
+ * transfer says "Partly saved"). It is the documented D-01 fallback while
+ * the transfer RPCs of 20261124061100 are not applied (`notice` says so),
+ * and the form for a person outside a vessel scope.
+ */
+export const LegacyTransferForm: React.FC<TransferCrewModalProps & { notice?: string | null }> = ({
   isOpen,
   onClose,
   crewMember,
   onSubmit,
   isLoading,
+  notice = null,
 }) => {
   const { vessels } = useVessels();
 
@@ -125,6 +137,11 @@ const TransferCrewModal: React.FC<TransferCrewModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
+        {notice ? (
+          <Alert variant="info" data-transfer-fallback="">
+            <AlertDescription>{notice}</AlertDescription>
+          </Alert>
+        ) : null}
         {pending ? (
           <Alert variant="info" data-transfer-refused="pending_placement">
             <AlertDescription>{TRANSFER_PENDING_MESSAGE}</AlertDescription>
@@ -255,6 +272,35 @@ const TransferCrewModal: React.FC<TransferCrewModalProps> = ({
         </Form>
       </DialogContent>
     </Dialog>
+  );
+};
+
+/**
+ * Transfer from the crew list row (and the legacy roster): the reviewed
+ * transfer wizard (X1-11; gap/04 C58, W9) on the route vessel, through
+ * TransferEntry (lazy). D-01: while its RPCs are missing, or outside a
+ * vessel, the legacy form above with the notice. The props stay the
+ * legacy ones, so the callers need no change.
+ */
+const TransferCrewModal: React.FC<TransferCrewModalProps> = (props) => {
+  const scope = useScope();
+  const { crewMember } = props;
+  if (!crewMember || !props.isOpen) return null;
+  const routeVessel = scope.scope === 'vessel' ? scope.vessel ?? null : null;
+  const vesselId = routeVessel?.id ?? null;
+  if (!vesselId) return <LegacyTransferForm {...props} />;
+  const name = [crewMember.preferred_name || crewMember.first_name, crewMember.last_name].filter(Boolean).join(' ') || 'crew member';
+  return (
+    <Suspense fallback={null}>
+      <TransferEntry
+        open
+        onClose={props.onClose}
+        vessel={{ id: vesselId, companyId: routeVessel?.company_id ?? null }}
+        profileId={crewMember.id}
+        personName={name}
+        renderFallback={(notice) => <LegacyTransferForm {...props} notice={notice} />}
+      />
+    </Suspense>
   );
 };
 

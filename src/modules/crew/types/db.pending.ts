@@ -48,6 +48,16 @@
  * satisfaction rules). The status and summary row shapes below are the
  * frozen contract of platform plan §1 contract 5 (X5-10A's R5 report).
  *
+ * 20261124061100_crew_transfers_employment.sql (X1-11): the controlled
+ * transfer between vessels (the wizard's options, start, review, ticks,
+ * submit, the fleet decision, cancel, the ONE completion definer
+ * transfer_crew, one transfer, a person's transfers; every answer is the
+ * transfer as one jsonb object, parsed by parseTransfer in lib/transfer.ts) and the
+ * employment RPCs X1-11B builds on (end employment, the vessel's
+ * employment history, the re-hire prefill), plus the probation and notice
+ * columns of the live crew_contracts. The daily sweep
+ * crew_transfers_complete_due is the service role's and not mirrored.
+ *
  * `CrewForeignPendingTables` is not this module's: the platform signature
  * store (SIG1, PR-X1-I) that the profile's signature card reads. It is not
  * in the contract map, because no build-out file defines it yet; the
@@ -913,6 +923,40 @@ export type CrewPassengerToggleRpcRow = { is_passenger_ship: boolean; rows_added
 /** crew_vessel_settings_save's p_patch. */
 export type VesselCrewSettingsPatch = { crew_uploads_enabled?: boolean; transfer_requires_fleet_approval?: boolean };
 
+// ---------------------------------------------------------------- 061100 rows
+
+/** New columns of the live crew_contracts (gap/04 C57: probation length and the two notice periods). */
+export type CrewContractNewColumns = {
+  probation_months: number | null;
+  notice_during_probation_days: number | null;
+  notice_after_probation_days: number | null;
+};
+
+/** The reasons crew_end_employment takes (W8; `transfer` is the transfer's own). */
+export type CrewEmploymentEndReason = Exclude<CrewEndReason, 'transfer'>;
+
+/** One row of crew_vessel_employment_history (RETURNS TABLE). */
+export type CrewEmploymentHistoryRpcRow = {
+  assignment_id: string;
+  profile_id: string;
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  preferred_name: string | null;
+  position_text: string | null;
+  position_id: string | null;
+  position_name: string | null;
+  department_key: string | null;
+  department_label: string | null;
+  join_date: string | null;
+  leave_date: string | null;
+  duration_days: number | null;
+  end_reason: string | null;
+  end_notes: string | null;
+  current_vessel_id: string | null;
+  current_vessel_name: string | null;
+};
+
 // ---------------------------------------------------------------- the platform signature store (SIG1; not this module's)
 
 /** user_signature_images (gap/08 SIG1, PR-X1-I): not written yet; the profile card reads it and stays hidden while it is missing. */
@@ -969,6 +1013,7 @@ export type CrewPendingViews = {
 export type CrewPendingColumns = {
   crew_next_of_kin: PendingColumns<CrewNextOfKinNewColumns>;
   crew_certificates: PendingColumns<CrewCertificateNewColumns>;
+  crew_contracts: PendingColumns<CrewContractNewColumns>;
 };
 
 export type CrewPendingFunctions = {
@@ -1041,4 +1086,33 @@ export type CrewPendingFunctions = {
     Args: { p_type_id: string; p_satisfies_type_id: string; p_kind?: CrewDocumentSatisfactionKind | null; p_remove?: boolean };
     Returns: string;
   };
+  /** One jsonb object each (parseTransferOptions / parseTransfer in lib/transfer.ts): the wizard's options, or a transfer with the caller's rights. */
+  transfer_crew_options: { Args: { p_profile_id: string; p_from_vessel_id: string }; Returns: Json };
+  transfer_crew_start: {
+    Args: {
+      p_profile_id: string;
+      p_from_vessel_id: string;
+      p_to_vessel_id: string;
+      p_to_position_id: string | null;
+      p_sign_off_date: string;
+      p_sign_on_date: string;
+      p_notes?: string | null;
+    };
+    Returns: Json;
+  };
+  transfer_crew_review: { Args: { p_transfer_id: string }; Returns: Json };
+  transfer_crew_acknowledge: { Args: { p_transfer_id: string; p_items: Json }; Returns: Json };
+  transfer_crew_submit: { Args: { p_transfer_id: string }; Returns: Json };
+  transfer_crew_decide: { Args: { p_transfer_id: string; p_decision: 'approve' | 'decline'; p_reason?: string | null }; Returns: Json };
+  transfer_crew_cancel: { Args: { p_transfer_id: string; p_reason?: string | null }; Returns: Json };
+  transfer_crew: { Args: { p_transfer_id: string }; Returns: Json };
+  transfer_crew_detail: { Args: { p_transfer_id: string }; Returns: Json };
+  /** A jsonb array of transfers (the same shape as transfer_crew_detail). */
+  crew_transfers_for_profile: { Args: { p_profile_id: string }; Returns: Json };
+  crew_end_employment: {
+    Args: { p_profile_id: string; p_vessel_id: string; p_end_date: string; p_reason: CrewEmploymentEndReason; p_notes?: string | null };
+    Returns: Json;
+  };
+  crew_vessel_employment_history: { Args: { p_vessel_id: string; p_department_key?: string | null }; Returns: CrewEmploymentHistoryRpcRow[] };
+  crew_rehire_prefill: { Args: { p_profile_id: string; p_vessel_id: string }; Returns: Json };
 };
