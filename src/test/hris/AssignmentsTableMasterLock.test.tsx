@@ -10,11 +10,15 @@
  *   the guard's sentence, and Save sends them at their stored values;
  * - ended Master rows (history) and other rows stay open to HR editors;
  * - making another row a current Master is stopped in the form (rule e);
- * - a 42501 refusal shows the guard's DETAIL sentence, never its code.
+ * - a 42501 refusal shows the guard's DETAIL sentence, never its code;
+ * - on the editor's own rows (`ownRows`, Phase 2 round 7 item 5; D-198,
+ *   D-218) Position and Rank need users-access admin of the row's vessel:
+ *   without it they are disabled before Save with D-218's sentence and go
+ *   out at their stored values; dates and notes stay open.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MASTER_OFFICE_MESSAGE } from '@/modules/crew/lib/crewUpdateErrors';
+import { MASTER_OFFICE_MESSAGE, OWN_POSITION_MESSAGE } from '@/modules/crew/lib/crewUpdateErrors';
 import type { AssignmentPatch, AssignmentRecord } from '@/modules/hris/lib/employmentHistory';
 
 const h = vi.hoisted(() => ({
@@ -66,8 +70,8 @@ const ROWS: AssignmentRecord[] = [
 
 type OnSave = (assignment: AssignmentRecord, patch: AssignmentPatch) => Promise<unknown>;
 
-const renderTable = (onSave: OnSave = vi.fn<OnSave>().mockResolvedValue(undefined)) =>
-  render(<AssignmentsTable canEdit today={TODAY} onSave={onSave} assignments={ROWS} />);
+const renderTable = (onSave: OnSave = vi.fn<OnSave>().mockResolvedValue(undefined), options: { ownRows?: boolean } = {}) =>
+  render(<AssignmentsTable canEdit today={TODAY} onSave={onSave} assignments={ROWS} ownRows={options.ownRows} />);
 
 const rowOf = (note: string): HTMLElement => {
   const tr = screen.getByText(note).closest('tr');
@@ -220,5 +224,73 @@ describe('AssignmentsTable: Master office lock (D-244)', () => {
     expect(document.body.textContent ?? '').not.toContain('master_office_change_refused');
     // The row stays in edit mode so the change is not lost.
     expect(screen.getByLabelText('Notes')).toHaveValue('Moved to tender duty');
+  });
+});
+
+describe('AssignmentsTable: your own position and rank (D-218, guard rule d)', () => {
+  const TITLE_FIELDS = ['Position', 'Rank'] as const;
+  const DATE_FIELDS = ['Join date', 'Leave date'] as const;
+
+  it('(h) locks Position and Rank of your own row before Save, with the D-218 sentence; dates and notes stay open', async () => {
+    const onSave = vi.fn<OnSave>().mockResolvedValue(undefined);
+    renderTable(onSave, { ownRows: true });
+    startEdit(NOTE.deckhand);
+    for (const label of TITLE_FIELDS) {
+      const input = screen.getByLabelText(label);
+      expect(input, label).toBeDisabled();
+      expect(input, label).toHaveAccessibleDescription(OWN_POSITION_MESSAGE);
+    }
+    for (const label of DATE_FIELDS) {
+      expect(screen.getByLabelText(label), label).toBeEnabled();
+      expect(screen.getByLabelText(label), label).not.toHaveAttribute('aria-describedby');
+    }
+    expect(screen.getByLabelText('Notes')).toBeEnabled();
+    expect(screen.getByText(OWN_POSITION_MESSAGE)).toBeVisible();
+    expect(screen.queryByText(MASTER_OFFICE_MESSAGE)).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Leave date'), { target: { value: '2026-12-31' } });
+    save();
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    // The title goes out as stored, so Save sends no own office change.
+    expect(onSave.mock.calls[0][1]).toMatchObject({ position: 'Deckhand', rank: null, leave_date: '2026-12-31' });
+  });
+
+  it('(i) locks an ended own row too (the guard refuses any own-row title change)', () => {
+    renderTable(undefined, { ownRows: true });
+    startEdit(NOTE.ended);
+    expect(screen.getByLabelText('Position')).toBeDisabled();
+    expect(screen.getByLabelText('Join date')).toBeEnabled();
+  });
+
+  it('(j) a users-access admin of the row’s vessel may change their own position', async () => {
+    h.can.mockImplementation((key, ctx) => key === ADMIN_KEY && ctx?.vesselId === 'v-dra');
+    const onSave = vi.fn<OnSave>().mockResolvedValue(undefined);
+    renderTable(onSave, { ownRows: true });
+    startEdit(NOTE.deckhand);
+    expectUnlocked();
+    expect(screen.queryByText(OWN_POSITION_MESSAGE)).toBeNull();
+    fireEvent.change(screen.getByLabelText('Position'), { target: { value: 'Lead Deckhand' } });
+    save();
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][1]).toMatchObject({ position: 'Lead Deckhand' });
+
+    // Their own row on another vessel stays locked.
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save' })).toBeNull());
+    startEdit(NOTE.otherVessel);
+    expect(screen.getByLabelText('Position')).toBeDisabled();
+  });
+
+  it('(k) on your own current Master row the office lock (all four fields, the Master sentence) applies', () => {
+    renderTable(undefined, { ownRows: true });
+    startEdit(NOTE.sitting);
+    expectLocked();
+    expect(screen.queryByText(OWN_POSITION_MESSAGE)).toBeNull();
+  });
+
+  it('(l) someone else’s rows are not locked by it', () => {
+    renderTable(undefined, { ownRows: false });
+    startEdit(NOTE.deckhand);
+    expectUnlocked();
+    expect(screen.queryByText(OWN_POSITION_MESSAGE)).toBeNull();
   });
 });

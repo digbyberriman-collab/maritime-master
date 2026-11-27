@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useCan } from '@/lib/permissions/useCan';
-import { crewRefusalMessage, isMasterOffice, MASTER_OFFICE_MESSAGE } from '@/modules/crew/lib/crewUpdateErrors';
+import { crewRefusalMessage, isMasterOffice, MASTER_OFFICE_MESSAGE, OWN_POSITION_MESSAGE } from '@/modules/crew/lib/crewUpdateErrors';
 import { formatDate, humanise } from '@/modules/hris/lib/format';
 import { assignmentDays, END_REASONS, isoDay, type AssignmentPatch, type AssignmentRecord } from '@/modules/hris/lib/employmentHistory';
 
@@ -22,6 +22,12 @@ interface AssignmentsTableProps {
   onSave: (assignment: AssignmentRecord, patch: AssignmentPatch) => Promise<unknown>;
   /** Right-hand header slot (e.g. the CSV export button). */
   actions?: React.ReactNode;
+  /**
+   * The rows are the signed-in editor's own assignments (the history of
+   * their own profile). Changing your own position or rank needs
+   * users-access admin of the row's vessel (guard rule d, D-198, D-218).
+   */
+  ownRows?: boolean;
 }
 
 interface Draft {
@@ -74,10 +80,19 @@ const isCurrentMasterRow = (a: AssignmentRecord, today: Date): boolean =>
  * users_access.admin of the vessel: those inputs are disabled with the
  * guard's sentence and always go out at their stored values. Appointing a
  * Master or Captain on any other row is stopped in the form for the same
- * people (guard rule e). A refusal from the server shows the guard's DETAIL
- * sentence (D-225), never its code.
+ * people (guard rule e). On the editor's own rows (`ownRows`) Position and
+ * Rank are locked the same way without users_access.admin of the row's
+ * vessel, with D-218's sentence (guard rule d, self_office_change_refused),
+ * instead of the guard's refusal after Save. A refusal from the server
+ * shows the guard's DETAIL sentence (D-225), never its code.
+ *
+ * Layout (Phase 2 round 7 item 6): the table scrolls inside its card at
+ * any width, the edit row's inputs keep a usable width, the lock and
+ * error sentences stay pinned to the card's left edge and the Edit / Save
+ * and Cancel buttons to its right edge while the row scrolls, so the page
+ * itself never scrolls sideways (390 px included) and Save stays in reach.
  */
-export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments, today, canEdit, isLoading, isSaving, onSave, actions }) => {
+export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments, today, canEdit, isLoading, isSaving, onSave, actions, ownRows = false }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +105,9 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
   const canAdminEditingVessel = useCan('admin.access.users_access.admin', { vesselId: editingRow?.vessel_id ?? null });
   const officeLock: string | null =
     editingRow && isCurrentMasterRow(editingRow, today) && !canAdminEditingVessel ? MASTER_OFFICE_MESSAGE : null;
+  /** Your own position and rank (guard rule d); the office lock, when it applies, already covers them. */
+  const ownLock: string | null = editingRow && ownRows && !canAdminEditingVessel && !officeLock ? OWN_POSITION_MESSAGE : null;
+  const titleLock = officeLock ?? ownLock;
 
   const startEdit = (a: AssignmentRecord) => {
     setEditingId(a.id);
@@ -110,7 +128,9 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
     const stored = toDraft(a);
     const d: Draft = officeLock
       ? { ...draft, join_date: stored.join_date, leave_date: stored.leave_date, position: stored.position, rank: stored.rank }
-      : draft;
+      : ownLock
+        ? { ...draft, position: stored.position, rank: stored.rank }
+        : draft;
     if (!d.join_date) {
       setError('Join date is required.');
       return;
@@ -154,8 +174,8 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
   const update = (key: keyof Draft, value: string) => setDraft((d) => (d ? { ...d, [key]: value } : d));
 
   return (
-    <Card className="border-border/60">
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
+    <Card className="min-w-0 border-border/60" data-assignments-table="">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Ship className="h-4 w-4 text-muted-foreground" />
           Assignments
@@ -173,7 +193,7 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
         ) : assignments.length === 0 ? (
           <p className="px-6 pb-6 text-sm text-muted-foreground">No vessel assignments recorded.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="max-w-full overflow-x-auto overscroll-x-contain" data-assignments-scroll="">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -185,7 +205,11 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                   <TableHead className="text-right">Days</TableHead>
                   <TableHead>Reason</TableHead>
                   <TableHead className="min-w-[180px]">Notes</TableHead>
-                  {canEdit && <TableHead className="w-[88px]" />}
+                  {canEdit && (
+                    <TableHead className="sticky right-0 z-[1] w-[88px] bg-card">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -206,21 +230,21 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                             <Input
                               value={draft.position}
                               onChange={(e) => update('position', e.target.value)}
-                              className="h-8"
+                              className="h-8 min-w-[9rem] [@media(pointer:coarse)]:h-11"
                               aria-label="Position"
-                              disabled={Boolean(officeLock)}
-                              aria-describedby={officeLock ? lockId : undefined}
+                              disabled={Boolean(titleLock)}
+                              aria-describedby={titleLock ? lockId : undefined}
                             />
                           </TableCell>
                           <TableCell>
                             <Input
                               value={draft.rank}
                               onChange={(e) => update('rank', e.target.value)}
-                              className="h-8"
+                              className="h-8 min-w-[8rem] [@media(pointer:coarse)]:h-11"
                               placeholder="—"
                               aria-label="Rank"
-                              disabled={Boolean(officeLock)}
-                              aria-describedby={officeLock ? lockId : undefined}
+                              disabled={Boolean(titleLock)}
+                              aria-describedby={titleLock ? lockId : undefined}
                             />
                           </TableCell>
                           <TableCell>
@@ -228,7 +252,7 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                               type="date"
                               value={draft.join_date}
                               onChange={(e) => update('join_date', e.target.value)}
-                              className="h-8"
+                              className="h-8 min-w-[9.5rem] [@media(pointer:coarse)]:h-11"
                               aria-label="Join date"
                               disabled={Boolean(officeLock)}
                               aria-describedby={officeLock ? lockId : undefined}
@@ -239,7 +263,7 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                               type="date"
                               value={draft.leave_date}
                               onChange={(e) => update('leave_date', e.target.value)}
-                              className="h-8"
+                              className="h-8 min-w-[9.5rem] [@media(pointer:coarse)]:h-11"
                               aria-label="Leave date"
                               disabled={Boolean(officeLock)}
                               aria-describedby={officeLock ? lockId : undefined}
@@ -250,7 +274,7 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                           </TableCell>
                           <TableCell>
                             <Select value={draft.end_reason} onValueChange={(v) => update('end_reason', v)} disabled={!draft.leave_date}>
-                              <SelectTrigger className="h-8" aria-label="End reason">
+                              <SelectTrigger className="h-8 min-w-[9rem] [@media(pointer:coarse)]:h-11" aria-label="End reason">
                                 <SelectValue placeholder="—" />
                               </SelectTrigger>
                               <SelectContent className="bg-popover">
@@ -268,31 +292,33 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                             </Select>
                           </TableCell>
                           <TableCell>
-                            <Textarea value={draft.notes} onChange={(e) => update('notes', e.target.value)} rows={2} className="min-h-[32px] resize-none text-xs" aria-label="Notes" />
+                            <Textarea value={draft.notes} onChange={(e) => update('notes', e.target.value)} rows={2} className="min-h-[32px] min-w-[11rem] resize-none text-xs" aria-label="Notes" />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="sticky right-0 z-[1] border-l border-border/60 bg-card" data-assignment-actions="">
                             <div className="flex justify-end gap-1">
-                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => save(a)} disabled={isSaving} aria-label="Save">
-                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-green-500" />}
+                              <Button size="icon" variant="ghost" className="h-8 w-8 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11" onClick={() => save(a)} disabled={isSaving} aria-label="Save">
+                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-success" />}
                               </Button>
-                              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={cancel} disabled={isSaving} aria-label="Cancel">
+                              <Button size="icon" variant="ghost" className="h-8 w-8 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11" onClick={cancel} disabled={isSaving} aria-label="Cancel">
                                 <X className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
                         </TableRow>
-                        {officeLock && (
+                        {titleLock && (
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
-                            <TableCell id={lockId} colSpan={9} className="py-2 text-xs text-muted-foreground">
+                            <TableCell colSpan={9} className="py-2 text-xs text-muted-foreground">
                               {/* Pinned to the scrollport's left edge: the row is often scrolled right to reach Save. */}
-                              <div className="sticky left-4 max-w-xl">{officeLock}</div>
+                              <div id={lockId} className="sticky left-4 max-w-[min(36rem,calc(100vw-5rem))]" data-assignment-lock={officeLock ? 'master' : 'own'}>
+                                {titleLock}
+                              </div>
                             </TableCell>
                           </TableRow>
                         )}
                         {error && (
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
                             <TableCell colSpan={9} className="py-2 text-xs text-destructive">
-                              <div className="sticky left-4 max-w-xl">{error}</div>
+                              <div className="sticky left-4 max-w-[min(36rem,calc(100vw-5rem))]">{error}</div>
                             </TableCell>
                           </TableRow>
                         )}
@@ -315,9 +341,9 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                       <TableCell className="text-muted-foreground">{a.leave_date ? reasonLabel(a.end_reason) : '—'}</TableCell>
                       <TableCell className="max-w-[260px] whitespace-pre-line text-xs text-muted-foreground">{a.notes ?? '—'}</TableCell>
                       {canEdit && (
-                        <TableCell>
+                        <TableCell className="sticky right-0 z-[1] bg-card" data-assignment-actions="">
                           <div className="flex justify-end">
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(a)} disabled={Boolean(editingId)} aria-label="Edit assignment">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11" onClick={() => startEdit(a)} disabled={Boolean(editingId)} aria-label="Edit assignment">
                               <Pencil className="h-4 w-4" />
                             </Button>
                           </div>

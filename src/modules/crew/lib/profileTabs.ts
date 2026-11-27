@@ -9,7 +9,8 @@
  *                                            it replaced the old
  *                                            crew/people/:crewId/hours-of-rest
  *                                            page, so this tab serves that URL)
- *   employment                               X1-11B
+ *   employment                               X1-11B (Details, Transfers, Appraisals,
+ *                                            Familiarisation as `?sub=`)
  *
  * A tab names the capability it needs on the vessel, whether the person's
  * own profile always opens it, and the vessel module setting that can close
@@ -61,9 +62,10 @@ export const PROFILE_TAB_KEYS: readonly CrewProfileTabKey[] = [
 export const DEFAULT_PROFILE_TAB: CrewProfileTabKey = 'personal';
 
 /**
- * The tabs built so far, in display order. Medical is the one tab the
- * person's own profile does not open by itself: it needs the medical
- * capability on the vessel, as the server's tab list says (crew_profile_summary).
+ * The tabs built so far, in display order. Employment and Medical are the
+ * tabs the person's own profile does not open by itself: they need the
+ * contracts and employment or the medical capability on the vessel, as the
+ * server's tab list says (crew_profile_summary).
  */
 export const PROFILE_TABS: readonly ProfileTabDef[] = [
   {
@@ -125,6 +127,18 @@ export const PROFILE_TABS: readonly ProfileTabDef[] = [
     ownAlways: true,
     moduleSetting: 'crew_hor',
     load: () => import('@/modules/crew/components/profile/HoursOfRestTab'),
+  },
+  // X1-11B: the employment record (gap/04 C57): Details (terms, contract,
+  // probation and notice, timeline, Edit terms, End employment), Transfers,
+  // Appraisals and Familiarisation (`?sub=`). Contracts and employment view
+  // on the vessel, the person's own profile included, as the server's tab
+  // list says (crew_profile_summary).
+  {
+    key: 'employment',
+    label: 'Employment',
+    capability: CREW_CAPS.employmentView,
+    ownAlways: false,
+    load: () => import('@/modules/crew/components/profile/EmploymentTab'),
   },
   // X1-03B: the Health summary. Medical clearance on the vessel, own profile
   // included (D-X1-3; the person reads their own record in Health).

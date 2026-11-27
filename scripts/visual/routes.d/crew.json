@@ -668,5 +668,71 @@
     "slug": "crew-familiarisation-record",
     "waitFor": "[data-familiarisation-record]",
     "note": "X1-10: one record: overdue status and due line, progress, the reopen reason, the checklist by section with who ticked what, and the crew and supervisor sign-off with why Sign is closed. Until PR-X1-G adds rpc/familiarisation_record_detail.json, capture it with a scratch --fixtures copy that answers it; without it the page says the record could not be found."
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/employment?sub=details",
+    "slug": "crew-profile-employment-details",
+    "waitFor": "[data-crew-profile] [data-employment-panel=\"details\"] [data-profile-card=\"employment-terms\"]",
+    "note": "X1-11B: the profile's Employment tab, Details (gap/04 C57): the terms on the vessel with the contract's probation and two notice periods, Edit terms and End employment for HR editors, the contract card and the employment timeline. Until PR-X1-G adds employment to rpc/crew_profile_summary.json's tabs, capture it with a scratch --fixtures copy; with the repo fixtures the tab URL lands on Personal."
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/employment?sub=details",
+    "slug": "crew-profile-employment-end",
+    "waitFor": "[data-crew-profile] [data-employment-panel=\"details\"]",
+    "note": "X1-11B: End employment open (gap/04 W8): the last day, W8's reasons with what happens to the contract, notes and the list of effects (same scratch --fixtures note as the Details capture)",
+    "actions": [
+      {
+        "click": "[data-employment-panel=\"details\"] button:has-text(\"End employment\")"
+      },
+      {
+        "waitFor": "[data-end-employment=\"form\"]"
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/employment?sub=details",
+    "slug": "crew-profile-employment-terms-edit",
+    "waitFor": "[data-crew-profile] [data-employment-panel=\"details\"]",
+    "note": "X1-11B: Edit employment terms open (gap/04 C57): role, dates (the start date fixed), contract type, probation and the two notice periods, leave allowance (same scratch --fixtures note as the Details capture)",
+    "actions": [
+      {
+        "click": "[data-employment-panel=\"details\"] button:has-text(\"Edit terms\")"
+      },
+      {
+        "waitFor": "[data-terms-edit] form"
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/employment?sub=transfers",
+    "slug": "crew-profile-employment-transfers",
+    "waitFor": "[data-crew-profile] [data-employment-panel=\"transfers\"]",
+    "note": "X1-11B: the Employment tab's Transfers (crew_transfers_for_profile): from and to, the dates, same or new position, the status and Open (?transfer=). Until PR-X1-G adds rpc/crew_transfers_for_profile.json (not in X1's fixture list) the RPC answers null and the panel shows its error state; capture with a scratch --fixtures copy."
+  },
+  {
+    "path": "/v/dra/crew/employment-history",
+    "slug": "crew-employment-history",
+    "waitFor": "[data-employment-history=\"ready\"] table tbody tr",
+    "note": "X1-11B: the vessel's Employment History (gap/04 C59): past crew and records, department filter, crew, position, department, period, duration and reason, View and Re-hire (stopped for someone on a crew today)"
+  },
+  {
+    "path": "/v/dra/crew/employment-history?dept=interior",
+    "slug": "crew-employment-history-department",
+    "waitFor": "[data-employment-history=\"ready\"]",
+    "note": "X1-11B: Employment History narrowed to a department (?dept=; the server filters, the static fixture answers every call alike)"
+  },
+  {
+    "path": "/hris/employee-records/employment-history?crew=b0000000-0000-4000-8000-000000000015",
+    "slug": "hris-employment-history-edit",
+    "waitFor": "[data-assignments-table] table tbody tr",
+    "note": "X1-11B (Phase 2 round 7 item 6): the HRIS Employment history with an assignment row in edit: the grid is one column on phones, the table scrolls inside its card, no page overflow at 390 px",
+    "actions": [
+      {
+        "click": "[data-assignments-table] button[aria-label=\"Edit assignment\"]"
+      },
+      {
+        "waitFor": "[data-assignments-table] input[aria-label=\"Position\"]"
+      }
+    ]
   }
 ]

@@ -21,7 +21,7 @@ import {
 } from '@/modules/crew/lib/profileTabs';
 
 describe('the registry', () => {
-  it('lists Personal and Contact (X1-03), Documents, STCW and Qualifications (X1-04B), Training, Medical and Activity (X1-03B), Hours of rest (X1-07B), Personal first (the default)', () => {
+  it('lists Personal and Contact (X1-03), Documents, STCW and Qualifications (X1-04B), Training, Medical and Activity (X1-03B), Hours of rest (X1-07B), Employment (X1-11B), Personal first (the default)', () => {
     expect(PROFILE_TABS.map((t) => [t.key, t.label])).toEqual([
       ['personal', 'Personal'],
       ['contact', 'Contact'],
@@ -30,6 +30,7 @@ describe('the registry', () => {
       ['qualifications', 'Qualifications'],
       ['training', 'Training'],
       ['hours-of-rest', 'Hours of rest'],
+      ['employment', 'Employment'],
       ['medical', 'Medical'],
       ['activity', 'Activity'],
     ]);
@@ -55,6 +56,10 @@ describe('the registry', () => {
       if (tab.key === 'medical') {
         expect(tab.capability).toBe(CREW_CAPS.medicalRecordsView);
         expect(tab.ownAlways).toBe(false);
+      } else if (tab.key === 'employment') {
+        // X1-11B: contracts and employment view, own profile included (the server's tab list says the same).
+        expect(tab.capability).toBe(CREW_CAPS.employmentView);
+        expect(tab.ownAlways).toBe(false);
       } else if (tab.key === 'hours-of-rest') {
         expect(tab.capability).toBe(CREW_CAPS.horView);
         expect(tab.ownAlways).toBe(true);
@@ -76,7 +81,7 @@ describe('the registry', () => {
     expect(profileTabFor('medical')?.label).toBe('Medical');
     expect(profileTabFor('stcw')?.label).toBe('STCW');
     expect(profileTabFor('hours-of-rest')?.label).toBe('Hours of rest');
-    expect(profileTabFor('employment')).toBeNull();
+    expect(profileTabFor('employment')?.label).toBe('Employment');
     expect(profileTabFor('nonsense')).toBeNull();
     expect(profileTabFor(null)).toBeNull();
   });
@@ -95,7 +100,8 @@ describe('visibleProfileTabs', () => {
   const all = () => true;
 
   it('follows the server answer when there is one', () => {
-    expect(visibleProfileTabs({ serverTabs: ['personal', 'contact', 'documents', 'employment'], own: false, can: none }).map((t) => t.key)).toEqual(['personal', 'contact', 'documents']);
+    expect(visibleProfileTabs({ serverTabs: ['personal', 'contact', 'documents', 'employment'], own: false, can: none }).map((t) => t.key)).toEqual(['personal', 'contact', 'documents', 'employment']);
+    expect(visibleProfileTabs({ serverTabs: ['personal', 'contact', 'documents', 'nonsense'], own: false, can: none }).map((t) => t.key)).toEqual(['personal', 'contact', 'documents']);
     expect(visibleProfileTabs({ serverTabs: ['contact'], own: true, can: all }).map((t) => t.key)).toEqual(['contact']);
     expect(visibleProfileTabs({ serverTabs: [], own: true, can: all })).toEqual([]);
   });
@@ -110,13 +116,15 @@ describe('visibleProfileTabs', () => {
     ]);
     // Medical opens only with the medical capability, own profile included (X1-03B).
     expect(visibleProfileTabs({ serverTabs: null, own: true, can: (k) => k === CREW_CAPS.medicalRecordsView }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'hours-of-rest', 'medical', 'activity']);
-    expect(PROFILE_TAB_CAPABILITIES).toEqual([CREW_CAPS.profilesView, CREW_CAPS.horView, CREW_CAPS.medicalRecordsView]);
+    // Employment opens only with contracts and employment view, own profile included (X1-11B).
+    expect(visibleProfileTabs({ serverTabs: null, own: true, can: (k) => k === CREW_CAPS.employmentView }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'hours-of-rest', 'employment', 'activity']);
+    expect(PROFILE_TAB_CAPABILITIES).toEqual([CREW_CAPS.profilesView, CREW_CAPS.horView, CREW_CAPS.employmentView, CREW_CAPS.medicalRecordsView]);
     expect(visibleProfileTabs({ serverTabs: null, own: false, can: none })).toEqual([]);
   });
 
   it('a module setting that is off closes a tab that names it (Hours of rest: crew_hor)', () => {
     const off = visibleProfileTabs({ serverTabs: null, own: true, can: all, moduleOn: (key) => key !== 'crew_hor' });
-    expect(off.map((t) => t.key)).toEqual(['personal', 'contact', 'documents', 'stcw', 'qualifications', 'training', 'medical', 'activity']);
+    expect(off.map((t) => t.key)).toEqual(['personal', 'contact', 'documents', 'stcw', 'qualifications', 'training', 'employment', 'medical', 'activity']);
     // Also over the server's list.
     expect(visibleProfileTabs({ serverTabs: ['personal', 'hours-of-rest'], own: true, can: all, moduleOn: () => false }).map((t) => t.key)).toEqual(['personal']);
     const on = visibleProfileTabs({ serverTabs: null, own: true, can: all, moduleOn: () => true });
@@ -134,7 +142,8 @@ describe('resolveProfileTab', () => {
   it('an unknown, missing or not-yet-built tab lands on Personal', () => {
     expect(resolveProfileTab('nonsense', visible)?.key).toBe('personal');
     expect(resolveProfileTab(null, visible)?.key).toBe('personal');
-    expect(resolveProfileTab('employment', visible)?.key).toBe('personal');
+    expect(resolveProfileTab('appraisals', visible)?.key).toBe('personal');
+    expect(resolveProfileTab('employment', visible)?.key).toBe('employment');
     expect(resolveProfileTab('documents', visible)?.key).toBe('documents');
   });
 

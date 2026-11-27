@@ -10,6 +10,9 @@ export const HOR_REPORT_PATH = `${CREW_PATHS.hoursOfRest}/report`;
 /** The planner's tabs (X1-09B), relative to `/v/:vesselCode`: timeline | manning | requests | configuration. */
 export const PLANNER_TAB_PATH = `${CREW_PATHS.planner}/:tab`;
 
+/** The vessel's employment history (X1-11B), relative to `/v/:vesselCode`; the Employment History leaf's path. */
+export const EMPLOYMENT_HISTORY_PATH = `${CREW_ROOT}/employment-history`;
+
 /**
  * Crew routes, as data (BUILD-PLAN B8). The module manifest (./module.ts)
  * registers them, and the router mounts them inside their scope's layout
@@ -76,6 +79,14 @@ export const PLANNER_TAB_PATH = `${CREW_PATHS.planner}/:tab`;
  * cards. PR-X1-A part 3 (PP3) makes the site map's generated crew ->
  * crew/list redirect give way to a root a manifest routes, so this route is
  * the only one at /v/:vesselCode/crew.
+ * X1-11B serves the vessel's employment history (EmploymentHistoryPage)
+ * at crew/employment-history?dept= behind
+ * hris.employee_records.contracts_employment.view (the page asks again for
+ * the route vessel, and the server for the rows): everyone who has left the
+ * crew with the period, its length and the reason; View opens the person's
+ * Employment tab and Re-hire opens Add crew (crew/new?rehire=). The
+ * profile's Employment tab is a crew/people/:profileId/:tab page
+ * (lib/profileTabs.ts), not a route of its own.
  * X1-04B adds the person's own documents at /me/documents (scope personal,
  * path `documents`, guard vessel.crew.crew_certificates.view_own; the page
  * asks again and the server answers only for the caller's own profile). The
@@ -139,6 +150,8 @@ export const CREW_ROUTES: readonly RouteDef[] = [
   // page's D-01 fallback.
   vesselCapabilityPage(CREW_PATHS.familiarisation, CREW_CAPS.famView, () => import('@/modules/crew/pages/FamiliarisationPage')),
   vesselScopePage(`${CREW_PATHS.familiarisation}/:recordId`, () => import('@/modules/crew/pages/FamiliarisationRecordPage')),
+  // The vessel's employment history (X1-11B; gap/04 C59, W8): ended assignments, `?dept=` narrows it to a department.
+  vesselCapabilityPage(EMPLOYMENT_HISTORY_PATH, CREW_CAPS.employmentView, () => import('@/modules/crew/pages/EmploymentHistoryPage')),
   // The person's own documents (X1-04B; gap/04 C24-C26; X1 spec §4 personal row).
   {
     scope: 'personal',

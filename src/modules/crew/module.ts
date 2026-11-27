@@ -26,6 +26,9 @@
  *     a page under the same leaf, with no leaf of its own. X1-10 rebuilt
  *     Familiarisation (beta, behind vessel.crew.familiarisation.view); a
  *     record at crew/familiarisation/:recordId is a page under its leaf.
+ *     X1-11B rebuilt Employment History (beta, behind
+ *     hris.employee_records.contracts_employment.view;
+ *     crew/employment-history?dept=), with Re-hire into Add crew.
  *     X1-10B added the Dashboard leaf at order 5 (beta, behind
  *     vessel.crew.crew_list.view) with its page at the module root, crew:
  *     the crew dashboard (KPI tiles, Action required, Onboarding, Hours of
@@ -126,10 +129,11 @@ const manifest: ModuleManifest = {
       order: 110,
       node: L('Visitors & Occasional Workers', CREW_ROOT, { slug: 'visitors', icon: UserCheck, capability: 'vessel.crew.crew_list.view' }),
     },
+    // X1-11B: the vessel's employment history (ended assignments, re-hire), beta behind contracts and employment view.
     {
       slot: 'vessel.crew',
       order: 120,
-      node: L('Employment History', CREW_ROOT, { icon: Briefcase, capability: 'hris.employee_records.contracts_employment.view' }),
+      node: L('Employment History', CREW_ROOT, { icon: Briefcase, status: 'beta', capability: CREW_CAPS.employmentView }),
     },
     // X1-04B (PR-X1-J): the person's own documents at /me/documents, beta behind view_own.
     {

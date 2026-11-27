@@ -26,7 +26,7 @@ import KeepSearchNavigate from '@/app/router/KeepSearchNavigate';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
 import manifest from '@/modules/crew/module';
-import { CREW_ROUTES, HOR_REPORT_PATH, MY_DOCUMENTS_PATH, PLANNER_TAB_PATH } from '@/modules/crew/routes';
+import { CREW_ROUTES, EMPLOYMENT_HISTORY_PATH, HOR_REPORT_PATH, MY_DOCUMENTS_PATH, PLANNER_TAB_PATH } from '@/modules/crew/routes';
 import { ADD_CREW_PATH } from '@/modules/crew/lib/addCrewSchema';
 import { CREW_CAPABILITIES, CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS, CREW_ROOT } from '@/modules/crew/paths';
 import { MODULE_REGISTRY } from '@/app/registry/modules';
@@ -70,6 +70,8 @@ const TODAY: Record<string, string> = {
   [`vessel ${ADD_CREW_PATH}`]: '/src/modules/crew/pages/AddCrewPage.tsx',
   // X1-04B: the person's own documents at /me/documents (new; behind view_own).
   [`personal ${MY_DOCUMENTS_PATH}`]: '/src/modules/crew/pages/MyDocumentsPage.tsx',
+  // X1-11B: the vessel's employment history (new; behind contracts and employment view).
+  [`vessel ${EMPLOYMENT_HISTORY_PATH}`]: '/src/modules/crew/pages/EmploymentHistoryPage.tsx',
 };
 
 describe('crew routes', () => {
@@ -96,6 +98,7 @@ describe('crew routes', () => {
       else if (r.path === COMPLIANCE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.complianceView });
       else if (r.path === CREW_PATHS.hoursOfRest) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.horApprove });
       else if (r.path === HOR_REPORT_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.horView });
+      else if (r.path === EMPLOYMENT_HISTORY_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.employmentView });
       else if (r.scope === 'personal' && r.path === MY_DOCUMENTS_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.documentsViewOwn });
       else if (r.path === PLANNER_TAB_PATH || (r.scope === 'fleet' && r.path === CREW_FLEET_PATHS.planner)) {
         expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.schedulingView });
@@ -262,17 +265,23 @@ describe('crew nav', () => {
     expect(byLabel('Hours of Rest').alsoCovers).toEqual(['crew/people/*/hours-of-rest']);
   });
 
+  it('the rebuilt Employment History is beta behind contracts and employment view and reaches its page (X1-11B)', () => {
+    expect(byLabel('Employment History').status).toBe('beta');
+    expect(byLabel('Employment History').capability).toBe(CREW_CAPS.employmentView);
+    expect(byLabel('Employment History').path).toBe(EMPLOYMENT_HISTORY_PATH);
+    expect(describeElement(resolveUrl(appRouteObjects(), '/v/dra/crew/employment-history?dept=deck').element)).toContain('EmploymentHistoryPage.tsx');
+  });
+
   it('planned leaves have no route and carry the capability their page will need', () => {
     const routed = new Set(CREW_ROUTES.map((r) => r.path));
     const planned = crewLeaves.filter((f) => f.node.status !== 'live' && f.node.status !== 'beta');
-    expect(planned.map((f) => f.node.label)).toEqual(['Checklists', 'Performance Appraisals', 'Visitors & Occasional Workers', 'Employment History']);
+    expect(planned.map((f) => f.node.label)).toEqual(['Checklists', 'Performance Appraisals', 'Visitors & Occasional Workers']);
     for (const f of planned) {
       expect(routed.has(f.node.path), f.node.path).toBe(false);
       expect(MODULE_REGISTRY.hasPage(`/v/:vesselCode/${f.node.path}`), f.node.path).toBe(false);
     }
     expect(byLabel('Performance Appraisals').capability).toBe(CREW_CAPS.appraisalsView);
     expect(byLabel('Visitors & Occasional Workers').capability).toBe(CREW_CAPS.crewListView);
-    expect(byLabel('Employment History').capability).toBe(CREW_CAPS.employmentView);
     for (const f of planned) if (f.node.capability) expect(catalogue.has(f.node.capability), f.node.capability).toBe(true);
   });
 

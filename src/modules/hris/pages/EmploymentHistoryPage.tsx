@@ -12,6 +12,7 @@ import { Timeline } from '@/modules/hris/components/history/Timeline';
 import { AssignmentsTable } from '@/modules/hris/components/history/AssignmentsTable';
 import { RecentMovementsTable } from '@/modules/hris/components/history/RecentMovementsTable';
 import { assignmentsToCsv, isoDay, type AssignmentPatch, type AssignmentRecord } from '@/modules/hris/lib/employmentHistory';
+import { useAuth } from '@/modules/auth/contexts/AuthContext';
 
 const MOVEMENT_WINDOW_DAYS = 30;
 /** UTF-8 byte-order mark so Excel opens the CSV with the right encoding. */
@@ -29,8 +30,22 @@ const EmptyState: React.FC<{ icon: React.ElementType; title: string; description
   </Card>
 );
 
+/**
+ * HR's employment history of one crew member (assignments, contracts, rank
+ * changes and sea-service totals), or the recent crew movements when none is
+ * chosen.
+ *
+ * Layout (Phase 2 round 7 item 6; X1-11B): the page and its grid never grow
+ * wider than the screen: the grid is one column (minmax(0, 1fr)) until the
+ * extra-wide two-column layout, every grid item may shrink (min-width 0),
+ * and the assignments table scrolls inside its card, so at 390 px the page
+ * does not scroll sideways, in the read view or with an edit row open.
+ * The editor's own rows lock Position and Rank before Save without
+ * users-access admin of the vessel (item 5; D-218), see AssignmentsTable.
+ */
 const EmploymentHistoryPage: React.FC = () => {
   const { profileId, entry, setProfileId, selfOnly, access } = useSelectedCrew();
+  const { user } = useAuth();
   const history = useEmploymentHistory(profileId);
   const movements = useRecentMovements(MOVEMENT_WINDOW_DAYS);
 
@@ -63,9 +78,11 @@ const EmploymentHistoryPage: React.FC = () => {
   const loaded = Boolean(profileId) && !history.isLoading && Boolean(history.profile);
   const contractsOnly = loaded && !history.hasAccount && history.contracts.length > 0;
   const nothingToShow = loaded && !history.hasAccount && history.contracts.length === 0;
+  // The rows are the signed-in editor's own assignments (guard rule d: their own position and rank).
+  const ownRows = Boolean(user?.id) && history.profile?.user_id === user?.id;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6" data-employment-history-page="">
       <HrisPageHeader
         icon={History}
         title="Employment History"
@@ -87,12 +104,14 @@ const EmploymentHistoryPage: React.FC = () => {
 
       {!profileId ? (
         access.canView ? (
-          <RecentMovementsTable
-            movements={movements.movements}
-            isLoading={movements.isLoading || access.loading}
-            windowDays={MOVEMENT_WINDOW_DAYS}
-            onSelectCrew={(id) => setProfileId(id)}
-          />
+          <div className="min-w-0">
+            <RecentMovementsTable
+              movements={movements.movements}
+              isLoading={movements.isLoading || access.loading}
+              windowDays={MOVEMENT_WINDOW_DAYS}
+              onSelectCrew={(id) => setProfileId(id)}
+            />
+          </div>
         ) : (
           <EmptyState icon={UserRound} title="No crew member selected" description="Select a crew member to see their employment history." />
         )
@@ -121,16 +140,21 @@ const EmploymentHistoryPage: React.FC = () => {
       ) : (
         <>
           <ServiceSummary summary={history.summary} isLoading={history.isLoading} />
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-            <Timeline events={history.timeline} isLoading={history.isLoading} todayIso={isoDay(history.today)} />
-            <AssignmentsTable
-              assignments={history.assignments}
-              today={history.today}
-              canEdit={access.canEdit}
-              isLoading={history.isLoading}
-              isSaving={history.updateAssignment.isPending}
-              onSave={handleSave}
-            />
+          <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" data-employment-history-grid="">
+            <div className="min-w-0">
+              <Timeline events={history.timeline} isLoading={history.isLoading} todayIso={isoDay(history.today)} />
+            </div>
+            <div className="min-w-0">
+              <AssignmentsTable
+                assignments={history.assignments}
+                today={history.today}
+                canEdit={access.canEdit}
+                isLoading={history.isLoading}
+                isSaving={history.updateAssignment.isPending}
+                onSave={handleSave}
+                ownRows={ownRows}
+              />
+            </div>
           </div>
         </>
       )}
